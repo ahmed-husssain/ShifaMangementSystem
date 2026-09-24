@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../invoices/domain/invoice_model.dart';
@@ -36,21 +36,24 @@ String _formatActivityDescription(String desc) {
 }
 
 final activitiesProvider = StreamProvider<List<Activity>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('activities')
-      .orderBy('timestamp', descending: true)
-      .limit(10) // Restricted to last 10 activities for dashboard view
-      .snapshots()
-      .map((snapshot) => snapshot.docs.map((doc) {
-            final data = doc.data();
+  return Supabase.instance.client
+      .from('activities')
+      .stream(primaryKey: ['id'])
+      .order('timestamp', ascending: false)
+      .limit(10)
+      .map((rows) => rows.map((data) {
+            DateTime ts = DateTime.now();
+            if (data['timestamp'] is String) {
+              ts = DateTime.tryParse(data['timestamp']) ?? DateTime.now();
+            }
             return Activity(
-              id: doc.id,
-              userName: data['userName'] ?? 'Unknown',
+              id: (data['id'] ?? '').toString(),
+              userName: data['user_name'] ?? data['userName'] ?? 'Unknown',
               action: data['action'] ?? '',
               description: data['description'] ?? '',
-              entityType: data['entityType'] as String?,
-              entityId: (data['entityId'] ?? data['invoiceId'] ?? data['patientId']) as String?,
-              timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+              entityType: (data['entity_type'] ?? data['entityType']) as String?,
+              entityId: (data['entity_id'] ?? data['entityId'] ?? data['invoiceId'] ?? data['patientId']) as String?,
+              timestamp: ts,
             );
           }).toList());
 });
@@ -178,12 +181,13 @@ class ActivityFeedWidget extends ConsumerWidget {
                     if (isInvoice) {
                       if (act.entityId != null && act.entityId!.isNotEmpty) {
                         try {
-                          final doc = await FirebaseFirestore.instance
-                              .collection('invoices')
-                              .doc(act.entityId)
-                              .get();
-                          if (doc.exists && context.mounted) {
-                            final invoice = Invoice.fromMap(doc.data()!, doc.id);
+                          final doc = await Supabase.instance.client
+                              .from('invoices')
+                              .select()
+                              .eq('id', act.entityId!)
+                              .maybeSingle();
+                          if (doc != null && context.mounted) {
+                            final invoice = Invoice.fromMap(doc, (doc['id'] ?? '').toString());
                             showDialog(
                               context: context,
                               builder: (_) => InvoiceDetailsDialog(invoice: invoice),
@@ -227,7 +231,7 @@ class _AllLogsDialog extends StatefulWidget {
 }
 
 class _AllLogsDialogState extends State<_AllLogsDialog> {
-  final List<DocumentSnapshot> _logs = [];
+  final List<Map<String, dynamic>> _logs = [];
   bool _isLoading = true;
   bool _hasMore = true;
   bool _isLoadingMore = false;
@@ -241,17 +245,17 @@ class _AllLogsDialogState extends State<_AllLogsDialog> {
 
   Future<void> _fetchInitialLogs() async {
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('activities')
-          .orderBy('timestamp', descending: true)
-          .limit(_pageSize)
-          .get();
+      final snap = await Supabase.instance.client
+          .from('activities')
+          .select()
+          .order('timestamp', ascending: false)
+          .range(0, _pageSize - 1);
 
       if (mounted) {
         setState(() {
-          _logs.addAll(snap.docs);
+          _logs.addAll(List<Map<String, dynamic>>.from(snap));
           _isLoading = false;
-          if (snap.docs.length < _pageSize) {
+          if (snap.length < _pageSize) {
             _hasMore = false;
           }
         });
@@ -266,19 +270,18 @@ class _AllLogsDialogState extends State<_AllLogsDialog> {
 
     setState(() => _isLoadingMore = true);
     try {
-      final lastDoc = _logs.last;
-      final snap = await FirebaseFirestore.instance
-          .collection('activities')
-          .orderBy('timestamp', descending: true)
-          .startAfterDocument(lastDoc)
-          .limit(_pageSize)
-          .get();
+      final start = _logs.length;
+      final snap = await Supabase.instance.client
+          .from('activities')
+          .select()
+          .order('timestamp', ascending: false)
+          .range(start, start + _pageSize - 1);
 
       if (mounted) {
         setState(() {
-          _logs.addAll(snap.docs);
+          _logs.addAll(List<Map<String, dynamic>>.from(snap));
           _isLoadingMore = false;
-          if (snap.docs.length < _pageSize) {
+          if (snap.length < _pageSize) {
             _hasMore = false;
           }
         });
@@ -314,13 +317,13 @@ class _AllLogsDialogState extends State<_AllLogsDialog> {
                         child: ListView.builder(
                           itemCount: _logs.length,
                           itemBuilder: (context, index) {
-                            final data = _logs[index].data() as Map<String, dynamic>;
-                            final userName = data['userName'] ?? 'Unknown';
+                            final data = _logs[index];
+                            final userName = data['user_name'] ?? data['userName'] ?? 'Unknown';
                             final action = data['action'] ?? '';
                             final description = data['description'] ?? '';
-                            final entityType = data['entityType'] as String?;
-                            final entityId = (data['entityId'] ?? data['invoiceId'] ?? data['patientId']) as String?;
-                            final ts = (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+                            final entityType = (data['entity_type'] ?? data['entityType']) as String?;
+                            final entityId = (data['entity_id'] ?? data['entityId'] ?? data['invoiceId'] ?? data['patientId']) as String?;
+                            DateTime ts = DateTime.now(); if (data['timestamp'] is String) { ts = DateTime.tryParse(data['timestamp']) ?? DateTime.now(); }
                             final timeStr = DateFormat('MMM dd, yyyy • hh:mm a').format(ts);
                             final isInvoice = (entityType == 'invoice') || action.contains('INVOICE');
 
@@ -422,11 +425,11 @@ class _AllLogsDialogState extends State<_AllLogsDialog> {
                                     Navigator.pop(context); // Close logs modal
                                     if (isInvoice && entityId != null && entityId.isNotEmpty) {
                                       try {
-                                        final doc = await FirebaseFirestore.instance.collection('invoices').doc(entityId).get();
-                                        if (doc.exists && context.mounted) {
+                                        final doc = await Supabase.instance.client.from('invoices').select().eq('id', entityId).maybeSingle();
+                                        if (doc != null && context.mounted) {
                                           showDialog(
                                             context: context,
-                                            builder: (_) => InvoiceDetailsDialog(invoice: Invoice.fromMap(doc.data()!, doc.id)),
+                                            builder: (_) => InvoiceDetailsDialog(invoice: Invoice.fromMap(doc, (doc['id'] ?? '').toString())),
                                           );
                                           return;
                                         }

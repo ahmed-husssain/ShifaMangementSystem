@@ -118,31 +118,31 @@ class Invoice {
 
     return Invoice(
       invoiceId: documentId,
-      invoiceNumber: data['invoiceNumber'] ?? (documentId.length > 8 ? documentId.substring(0, 8).toUpperCase() : documentId),
-      patientId: data['patientId'] ?? '',
-      staffId: data['staffId'] ?? '',
+      invoiceNumber: (data['invoiceNumber'] ?? data['invoice_number'] ?? (documentId.length > 8 ? documentId.substring(0, 8).toUpperCase() : documentId)).toString(),
+      patientId: (data['patientId'] ?? data['patient_id'] ?? '').toString(),
+      staffId: (data['staffId'] ?? data['staff_id'] ?? '').toString(),
       subtotal: (data['subtotal'] ?? 0).toDouble(),
       discount: (data['discount'] ?? 0).toDouble(),
-      grandTotal: (data['grandTotal'] ?? 0).toDouble(),
+      grandTotal: (data['grandTotal'] ?? data['grand_total'] ?? 0).toDouble(),
       items: (data['items'] as List<dynamic>? ?? [])
-          .map((item) => InvoiceItem.fromMap(item as Map<String, dynamic>))
+          .map((item) => InvoiceItem.fromMap(Map<String, dynamic>.from(item as Map)))
           .toList(),
-      organizationId: data['organizationId'] ?? 'default',
-      createdBy: data['createdBy'] ?? '',
-      createdAt: parseDate(data['createdAt']) ?? DateTime.now(),
-      updatedBy: data['updatedBy'] ?? '',
-      updatedAt: parseDate(data['updatedAt']) ?? DateTime.now(),
-      isDeleted: data['isDeleted'] ?? false,
-      deletedAt: parseDate(data['deletedAt']),
-      deletedBy: data['deletedBy'],
-      paymentStatus: data['paymentStatus'] ?? 'Unpaid',
-      isDiscontinued: data['isDiscontinued'] ?? false,
-      fromDate: parseDate(data['fromDate']),
-      toDate: parseDate(data['toDate']),
+      organizationId: (data['organizationId'] ?? data['organization_id'] ?? 'default').toString(),
+      createdBy: (data['createdBy'] ?? data['created_by'] ?? '').toString(),
+      createdAt: parseDate(data['createdAt'] ?? data['created_at']) ?? DateTime.now(),
+      updatedBy: (data['updatedBy'] ?? data['updated_by'] ?? '').toString(),
+      updatedAt: parseDate(data['updatedAt'] ?? data['updated_at']) ?? DateTime.now(),
+      isDeleted: data['isDeleted'] ?? data['is_deleted'] ?? false,
+      deletedAt: parseDate(data['deletedAt'] ?? data['deleted_at']),
+      deletedBy: (data['deletedBy'] ?? data['deleted_by'])?.toString(),
+      paymentStatus: (data['paymentStatus'] ?? data['payment_status'] ?? 'Unpaid').toString(),
+      isDiscontinued: data['isDiscontinued'] ?? data['is_discontinued'] ?? false,
+      fromDate: parseDate(data['fromDate'] ?? data['from_date']),
+      toDate: parseDate(data['toDate'] ?? data['to_date']),
       days: parsedDays,
-      createdByName: data['createdByName'] as String?,
-      createdByRole: data['createdByRole'] as String?,
-      createdByUid: data['createdByUid'] as String? ?? data['createdBy'] as String? ?? data['staffId'] as String?,
+      createdByName: (data['createdByName'] ?? data['created_by_name']) as String?,
+      createdByRole: (data['createdByRole'] ?? data['created_by_role']) as String?,
+      createdByUid: (data['createdByUid'] ?? data['created_by_uid'] ?? data['createdBy'] ?? data['created_by'] ?? data['staffId'] ?? data['staff_id']) as String?,
     );
   }
 
@@ -171,6 +171,34 @@ class Invoice {
       'createdByName': createdByName,
       'createdByRole': createdByRole,
       'createdByUid': createdByUid ?? createdBy,
+    };
+  }
+
+  Map<String, dynamic> toSupabaseMap() {
+    return {
+      'id': invoiceId,
+      'invoice_number': invoiceNumber,
+      'patient_id': patientId.isEmpty ? null : patientId,
+      'staff_id': staffId,
+      'subtotal': subtotal,
+      'discount': discount,
+      'grand_total': grandTotal,
+      'items': items.map((e) => e.toMap()).toList(),
+      'organization_id': organizationId,
+      'created_by': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'updated_by': updatedBy,
+      'updated_at': updatedAt.toIso8601String(),
+      'is_deleted': isDeleted,
+      'deleted_at': deletedAt?.toIso8601String(),
+      'deleted_by': deletedBy,
+      'payment_status': paymentStatus,
+      'is_discontinued': isDiscontinued,
+      'from_date': fromDate?.toIso8601String(),
+      'to_date': toDate?.toIso8601String(),
+      'days': days,
+      'created_by_name': createdByName,
+      'created_by_role': createdByRole,
     };
   }
 

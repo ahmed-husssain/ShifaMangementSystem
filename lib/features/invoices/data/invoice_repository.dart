@@ -1,110 +1,175 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/invoice_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../patients/data/patient_repository.dart';
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
   return InvoiceRepository(
-    firestore: ref.watch(firestoreProvider),
+    supabase: ref.watch(supabaseClientProvider),
   );
 });
 
 class InvoiceRepository {
-  final FirebaseFirestore _firestore;
+  final SupabaseClient _supabase;
 
-  InvoiceRepository({required this._firestore});
+  InvoiceRepository({required SupabaseClient supabase}) : _supabase = supabase;
 
   Stream<List<Invoice>> watchStaffInvoices(String staffId, {Set<String>? staffPatientIds, int limit = 500}) {
-    return _firestore
-        .collection('invoices')
-        .where('isDeleted', isEqualTo: false)
+    return _supabase
+        .from('invoices')
+        .stream(primaryKey: ['id'])
+        .eq('is_deleted', false)
+        .order('created_at', ascending: false)
         .limit(limit)
-        .snapshots()
-        .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => Invoice.fromMap(doc.data(), doc.id))
-          .where((inv) {
-            if (inv.isDiscontinued) return false;
-            final isForStaffPatient = staffPatientIds != null && staffPatientIds.contains(inv.patientId);
-            final isCreatedByStaff = inv.createdBy == staffId || inv.staffId == staffId;
-            return isForStaffPatient || isCreatedByStaff;
-          })
-          .toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    });
+        .map((rows) {
+          final list = rows
+              .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
+              .where((inv) {
+                if (inv.isDiscontinued) return false;
+                final isForStaffPatient = staffPatientIds != null && staffPatientIds.contains(inv.patientId);
+                final isCreatedByStaff = inv.createdBy == staffId || inv.staffId == staffId;
+                return isForStaffPatient || isCreatedByStaff;
+              })
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   Stream<List<Invoice>> watchAllInvoices({bool includeDeleted = false, int limit = 500}) {
-    Query<Map<String, dynamic>> query = _firestore.collection('invoices');
-    
+    var stream = _supabase.from('invoices').stream(primaryKey: ['id']);
     if (!includeDeleted) {
-      query = query.where('isDeleted', isEqualTo: false);
+      stream = stream.eq('is_deleted', false);
     }
-    
-    return query.limit(limit).snapshots().map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => Invoice.fromMap(doc.data(), doc.id))
-          .where((inv) => !inv.isDiscontinued)
-          .toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    });
+    return stream
+        .order('created_at', ascending: false)
+        .limit(limit)
+        .map((rows) {
+          final list = rows
+              .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
+              .where((inv) => !inv.isDiscontinued)
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   Future<String> createInvoice(Invoice invoice, {String? userName}) async {
-    final docRef = _firestore.collection('invoices').doc();
-    
-    final batch = _firestore.batch();
-    batch.set(docRef, invoice.toMap());
+    final invoiceId = invoice.invoiceId.isNotEmpty
+        ? invoice.invoiceId
+        : DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Log the activity client-side
-    final activityRef = _firestore.collection('activities').doc();
-    batch.set(activityRef, {
-      'userId': invoice.createdBy,
-      'userName': (userName != null && userName.isNotEmpty) ? userName : 'Staff User',
-      'role': 'staff',
+    final invMap = invoice.toSupabaseMap();
+    invMap['id'] = invoiceId;
+
+    await _supabase.from('invoices').insert(invMap);
+
+    // Log activity
+    await _supabase.from('activities').insert({
+      'user_id': invoice.createdBy,
+      'user_name': (userName != null && userName.isNotEmpty) ? userName : (invoice.createdByName ?? 'Staff User'),
+      'role': invoice.createdByRole ?? 'staff',
       'action': 'INVOICE_CREATED',
-      'entityType': 'invoice',
-      'entityId': docRef.id,
-      'description': 'Created an invoice for patient ${invoice.patientId} for ${invoice.grandTotal}',
-      'organizationId': invoice.organizationId,
-      'timestamp': FieldValue.serverTimestamp(),
+      'entity_type': 'invoice',
+      'entity_id': invoiceId,
+      'description': 'Created invoice ${invoice.invoiceNumber} for amount PKR ${invoice.grandTotal.toStringAsFixed(0)}',
+      'organization_id': invoice.organizationId,
+      'timestamp': DateTime.now().toIso8601String(),
     });
 
-    // Update invoice count in system_metrics (totalRevenue is computed dynamically from streams)
-    final metricsRef = _firestore.collection('system_metrics').doc('stats_${invoice.organizationId}');
-    batch.set(metricsRef, {
-      'totalInvoices': FieldValue.increment(1),
-    }, SetOptions(merge: true));
-
-    await batch.commit();
-    return docRef.id;
+    return invoiceId;
   }
 
-  /// Updates an invoice. [previousPaymentStatus] is accepted for API clarity
-  /// but totalRevenue is computed dynamically from streams — no metrics write needed.
   Future<void> updateInvoice(Invoice invoice, {String? previousPaymentStatus}) async {
-    await _firestore.collection('invoices').doc(invoice.invoiceId).update(invoice.toMap());
+    await _supabase
+        .from('invoices')
+        .update(invoice.toSupabaseMap())
+        .eq('id', invoice.invoiceId);
+  }
+
+  Future<void> updateInvoiceStatus(String invoiceId, String status, {String? previousPaymentStatus}) async {
+    await _supabase.from('invoices').update({
+      'payment_status': status,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', invoiceId);
   }
 
   Future<void> deleteInvoice(String invoiceId) async {
-    final docRef = _firestore.collection('invoices').doc(invoiceId);
-    final snap = await docRef.get();
-    if (snap.exists) {
-      final inv = Invoice.fromMap(snap.data()!, invoiceId);
-      final batch = _firestore.batch();
-      batch.update(docRef, {'isDeleted': true});
+    await _supabase.from('invoices').update({
+      'is_deleted': true,
+      'deleted_at': DateTime.now().toIso8601String(),
+    }).eq('id', invoiceId);
+  }
 
-      // Decrement invoice count only — totalRevenue is computed dynamically from streams
-      final metricsRef = _firestore.collection('system_metrics').doc('stats_${inv.organizationId}');
-      batch.set(metricsRef, {
-        'totalInvoices': FieldValue.increment(-1),
-      }, SetOptions(merge: true));
+  Future<void> softDeleteInvoice({
+    required String invoiceId,
+    required String invoiceNumber,
+    required String userId,
+    required String organizationId,
+    String? userName,
+    String? role,
+  }) async {
+    final now = DateTime.now().toIso8601String();
 
-      await batch.commit();
-    }
+    await _supabase.from('invoices').update({
+      'is_deleted': true,
+      'deleted_at': now,
+      'deleted_by': userId,
+    }).eq('id', invoiceId);
+
+    await _supabase.from('activities').insert({
+      'user_id': userId,
+      'user_name': userName ?? 'User',
+      'role': role ?? 'staff',
+      'action': 'INVOICE_DELETED',
+      'entity_type': 'invoice',
+      'entity_id': invoiceId,
+      'description': 'Deleted invoice $invoiceNumber',
+      'organization_id': organizationId,
+      'timestamp': now,
+    });
+  }
+
+  Future<void> restoreInvoice({
+    required String invoiceId,
+    required String invoiceNumber,
+    required String userId,
+    required String organizationId,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+
+    await _supabase.from('invoices').update({
+      'is_deleted': false,
+      'deleted_at': null,
+      'deleted_by': null,
+      'updated_at': now,
+    }).eq('id', invoiceId);
+
+    await _supabase.from('activities').insert({
+      'user_id': userId,
+      'user_name': 'Admin',
+      'role': 'admin',
+      'action': 'INVOICE_RESTORED',
+      'entity_type': 'invoice',
+      'entity_id': invoiceId,
+      'description': 'Restored invoice $invoiceNumber',
+      'organization_id': organizationId,
+      'timestamp': now,
+    });
+  }
+
+  Future<List<Invoice>> getInvoicesForPatient(String patientId) async {
+    final res = await _supabase
+        .from('invoices')
+        .select()
+        .eq('patient_id', patientId)
+        .eq('is_deleted', false)
+        .order('created_at', ascending: false);
+
+    return (res as List)
+        .map((r) => Invoice.fromMap(r, (r['id'] ?? '').toString()))
+        .toList();
   }
 }
 
@@ -123,7 +188,7 @@ final staffInvoicesProvider = StreamProvider<List<Invoice>>((ref) {
   final list = allInvoices.where((inv) {
     if (inv.isDeleted || inv.isDiscontinued) return false;
     final isForStaffPatient = staffPatientIds.contains(inv.patientId);
-    final isCreatedByStaff = inv.createdBy == user.uid || inv.staffId == user.uid;
+    final isCreatedByStaff = inv.createdBy == user.id || inv.staffId == user.id;
     return isForStaffPatient || isCreatedByStaff;
   }).toList();
 

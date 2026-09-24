@@ -1,248 +1,159 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/patient_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 
 final patientRepositoryProvider = Provider<PatientRepository>((ref) {
   return PatientRepository(
-    firestore: ref.watch(firestoreProvider),
+    supabase: ref.watch(supabaseClientProvider),
   );
 });
 
+final allPatientsProvider = StreamProvider.autoDispose.family<List<Patient>, bool>((ref, includeDeleted) {
+  return ref.watch(patientRepositoryProvider).watchAllPatients(includeDeleted: includeDeleted);
+});
+
+final staffPatientsProvider = StreamProvider.autoDispose<List<Patient>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value([]);
+  return ref.watch(patientRepositoryProvider).watchStaffPatients(user.id);
+});
+
 class PatientRepository {
-  final FirebaseFirestore _firestore;
+  final SupabaseClient _supabase;
 
-  PatientRepository({required this._firestore});
+  PatientRepository({required SupabaseClient supabase}) : _supabase = supabase;
 
-  // Stream patients for a specific staff member (excluding deleted)
   Stream<List<Patient>> watchStaffPatients(String staffId) {
-    return _firestore
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => Patient.fromMap(doc.data(), doc.id))
-          .where((p) => p.createdBy == staffId || p.assignedStaffId == staffId)
-          .toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    });
+    return _supabase
+        .from('patients')
+        .stream(primaryKey: ['id'])
+        .eq('is_deleted', false)
+        .order('created_at', ascending: false)
+        .map((rows) {
+          final list = rows
+              .map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString()))
+              .where((p) => p.createdBy == staffId || p.assignedStaffId == staffId)
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
-  // Stream all patients (for Admin)
   Stream<List<Patient>> watchAllPatients({bool includeDeleted = false}) {
-    Query<Map<String, dynamic>> query = _firestore.collection('patients');
-    
+    var stream = _supabase.from('patients').stream(primaryKey: ['id']);
     if (!includeDeleted) {
-      query = query.where('isDeleted', isEqualTo: false);
+      stream = stream.eq('is_deleted', false);
     }
-    
-    return query.snapshots().map((snapshot) {
-      final list = snapshot.docs.map((doc) => Patient.fromMap(doc.data(), doc.id)).toList();
+    return stream.order('created_at', ascending: false).map((rows) {
+      final list = rows.map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString())).toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
     });
   }
 
   Future<void> createPatient(Patient patient, {String? userName}) async {
-    final docRef = _firestore.collection('patients').doc();
-    
-    final batch = _firestore.batch();
-    batch.set(docRef, patient.toMap());
+    final patientId = patient.patientId.isNotEmpty 
+        ? patient.patientId 
+        : DateTime.now().millisecondsSinceEpoch.toString();
+        
+    final pMap = patient.toSupabaseMap();
+    pMap['id'] = patientId;
 
-    // Log activity client-side
-    final activityRef = _firestore.collection('activities').doc();
-    batch.set(activityRef, {
-      'userId': patient.createdBy,
-      'userName': (userName != null && userName.isNotEmpty) ? userName : 'Staff User',
+    await _supabase.from('patients').insert(pMap);
+
+    // Log activity
+    await _supabase.from('activities').insert({
+      'user_id': patient.createdBy,
+      'user_name': (userName != null && userName.isNotEmpty) ? userName : 'Staff User',
       'role': 'staff',
       'action': 'PATIENT_CREATED',
-      'entityType': 'patient',
-      'entityId': docRef.id,
+      'entity_type': 'patient',
+      'entity_id': patientId,
       'description': 'Registered patient ${patient.patientName}',
-      'organizationId': patient.organizationId,
-      'timestamp': FieldValue.serverTimestamp(),
+      'organization_id': patient.organizationId,
+      'timestamp': DateTime.now().toIso8601String(),
     });
-
-    // Update system metrics client-side (replaces Cloud Function trigger)
-    final metricsRef = _firestore.collection('system_metrics').doc('stats_${patient.organizationId}');
-    batch.set(metricsRef, {
-      'totalPatients': FieldValue.increment(1),
-    }, SetOptions(merge: true));
-
-    await batch.commit();
   }
 
   Future<void> updatePatient(Patient patient) async {
-    await _firestore.collection('patients').doc(patient.patientId).update(patient.toMap());
+    await _supabase
+        .from('patients')
+        .update(patient.toSupabaseMap())
+        .eq('id', patient.patientId);
   }
 
-  /// Soft-delete a patient and all their associated invoices
   Future<void> softDeletePatient({
     required String patientId,
     required String patientName,
     required String userId,
     required String organizationId,
   }) async {
-    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
 
-    batch.update(_firestore.collection('patients').doc(patientId), {
-      'isDeleted': true,
-      'deletedAt': FieldValue.serverTimestamp(),
-      'deletedBy': userId,
-    });
+    await _supabase.from('patients').update({
+      'is_deleted': true,
+      'deleted_at': now,
+      'deleted_by': userId,
+    }).eq('id', patientId);
 
-    // Soft-delete all associated invoices
-    final invoicesSnap = await _firestore
-        .collection('invoices')
-        .where('patientId', isEqualTo: patientId)
-        .get();
-
-    for (final doc in invoicesSnap.docs) {
-      batch.update(doc.reference, {
-        'isDeleted': true,
-        'deletedAt': FieldValue.serverTimestamp(),
-        'deletedBy': userId,
-      });
-    }
-
-    // Update system metrics
-    final metricsRef = _firestore.collection('system_metrics').doc('stats_$organizationId');
-    batch.set(metricsRef, {
-      'totalPatients': FieldValue.increment(-1),
-      'totalInvoices': FieldValue.increment(-invoicesSnap.docs.length),
-    }, SetOptions(merge: true));
+    await _supabase.from('invoices').update({
+      'is_deleted': true,
+      'deleted_at': now,
+      'deleted_by': userId,
+    }).eq('patient_id', patientId);
 
     // Log activity
-    final activityRef = _firestore.collection('activities').doc();
-    batch.set(activityRef, {
-      'userId': userId,
-      'userName': 'User',
+    await _supabase.from('activities').insert({
+      'user_id': userId,
+      'user_name': 'User',
+      'role': 'admin',
       'action': 'PATIENT_DELETED',
-      'entityType': 'patient',
-      'entityId': patientId,
-      'description': 'Soft-deleted patient $patientName and ${invoicesSnap.docs.length} associated invoice(s)',
-      'organizationId': organizationId,
-      'timestamp': FieldValue.serverTimestamp(),
+      'entity_type': 'patient',
+      'entity_id': patientId,
+      'description': 'Soft-deleted patient $patientName and associated invoice(s)',
+      'organization_id': organizationId,
+      'timestamp': now,
     });
-
-    await batch.commit();
   }
 
-  /// Recalculate system_metrics from live database records and sync stats document
-  Future<void> syncSystemMetrics({String organizationId = 'default'}) async {
-    final patientsSnap = await _firestore
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)
-        .get();
-
-    final invoicesSnap = await _firestore
-        .collection('invoices')
-        .where('isDeleted', isEqualTo: false)
-        .get();
-
-    int patientCount = patientsSnap.docs.length;
-    int invoiceCount = invoicesSnap.docs.length;
-    double totalInvoiceRev = 0.0;
-    double totalPayout = 0.0;
-
-    final patientPayoutMap = <String, double>{};
-    final patientDaysMap = <String, int>{};
-    for (final doc in patientsSnap.docs) {
-      final data = doc.data();
-      patientPayoutMap[doc.id] = (data['staffPayment'] ?? 0.0).toDouble();
-      patientDaysMap[doc.id] = (data['days'] is num ? (data['days'] as num).toInt() : 0);
-    }
-
-    for (final doc in invoicesSnap.docs) {
-      final data = doc.data();
-      final isDiscontinued = data['isDiscontinued'] == true;
-      if (!isDiscontinued) {
-        // Both Paid and Unpaid valid invoices contribute to Revenue
-        totalInvoiceRev += (data['grandTotal'] ?? 0.0).toDouble();
-
-        final patientId = data['patientId'] ?? '';
-        final totalStaffPayment = patientPayoutMap[patientId] ?? (data['staffPayment'] ?? 0.0).toDouble();
-        final pDays = patientDaysMap[patientId] ?? 0;
-        final staffDailyRate = totalStaffPayment > 0 ? (totalStaffPayment / (pDays > 0 ? pDays : 30)) : 0.0;
-        
-        int invoiceDays = 0;
-        if (data['days'] is num) {
-          invoiceDays = (data['days'] as num).toInt();
-        } else if (data['items'] is List && (data['items'] as List).isNotEmpty) {
-          final firstItem = (data['items'] as List).first;
-          if (firstItem is Map && firstItem['quantity'] != null) {
-            invoiceDays = (firstItem['quantity'] as num).toInt();
-          }
-        }
-        if (invoiceDays <= 0) invoiceDays = 1;
-
-        totalPayout += invoiceDays * staffDailyRate;
-      }
-    }
-
-    double netProfit = totalInvoiceRev - totalPayout;
-
-    final metricsRef = _firestore.collection('system_metrics').doc('stats_$organizationId');
-    await metricsRef.set({
-      'totalPatients': patientCount,
-      'totalInvoices': invoiceCount,
-      'totalRevenue': netProfit,
-      'lastSyncedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
-  /// Restore a soft-deleted patient and all their associated invoices (Admin only, replaces restorePatient Cloud Function)
   Future<void> restorePatient({
     required String patientId,
     required String patientName,
     required String userId,
     required String organizationId,
   }) async {
-    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
 
-    batch.update(_firestore.collection('patients').doc(patientId), {
-      'isDeleted': false,
-      'deletedAt': FieldValue.delete(),
-      'deletedBy': FieldValue.delete(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
-    });
+    await _supabase.from('patients').update({
+      'is_deleted': false,
+      'deleted_at': null,
+      'deleted_by': null,
+      'updated_at': now,
+      'updated_by': userId,
+    }).eq('id', patientId);
 
-    // Restore associated invoices
-    final invoicesSnap = await _firestore
-        .collection('invoices')
-        .where('patientId', isEqualTo: patientId)
-        .get();
-
-    for (final doc in invoicesSnap.docs) {
-      batch.update(doc.reference, {
-        'isDeleted': false,
-        'deletedAt': FieldValue.delete(),
-        'deletedBy': FieldValue.delete(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': userId,
-      });
-    }
+    await _supabase.from('invoices').update({
+      'is_deleted': false,
+      'deleted_at': null,
+      'deleted_by': null,
+      'updated_at': now,
+    }).eq('patient_id', patientId);
 
     // Log activity
-    final activityRef = _firestore.collection('activities').doc();
-    batch.set(activityRef, {
-      'userId': userId,
-      'userName': 'Admin',
+    await _supabase.from('activities').insert({
+      'user_id': userId,
+      'user_name': 'Admin',
+      'role': 'admin',
       'action': 'PATIENT_RESTORED',
-      'entityType': 'patient',
-      'entityId': patientId,
+      'entity_type': 'patient',
+      'entity_id': patientId,
       'description': 'Restored patient $patientName and associated invoices',
-      'organizationId': organizationId,
-      'timestamp': FieldValue.serverTimestamp(),
+      'organization_id': organizationId,
+      'timestamp': now,
     });
-
-    await batch.commit();
   }
 
-  /// Discontinue a patient and lock all their associated invoices
   Future<void> discontinuePatient({
     required String patientId,
     required String patientName,
@@ -250,46 +161,31 @@ class PatientRepository {
     required String organizationId,
     String? userName,
   }) async {
-    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
 
-    batch.update(_firestore.collection('patients').doc(patientId), {
-      'isDiscontinued': true,
-      'status': 'discontinued',
-      'discontinuedAt': FieldValue.serverTimestamp(),
-      'discontinuedBy': userId,
-    });
+    await _supabase.from('patients').update({
+      'is_discontinued': true,
+      'discontinued_at': now,
+      'discontinued_by': userId,
+    }).eq('id', patientId);
 
-    // Update all associated invoices
-    final invoicesSnap = await _firestore
-        .collection('invoices')
-        .where('patientId', isEqualTo: patientId)
-        .get();
+    await _supabase.from('invoices').update({
+      'is_discontinued': true,
+    }).eq('patient_id', patientId);
 
-    for (final doc in invoicesSnap.docs) {
-      batch.update(doc.reference, {
-        'isDiscontinued': true,
-        'discontinuedAt': FieldValue.serverTimestamp(),
-        'discontinuedBy': userId,
-      });
-    }
-
-    // Log activity
-    final activityRef = _firestore.collection('activities').doc();
-    batch.set(activityRef, {
-      'userId': userId,
-      'userName': (userName != null && userName.isNotEmpty) ? userName : 'User',
+    await _supabase.from('activities').insert({
+      'user_id': userId,
+      'user_name': userName ?? 'Staff',
+      'role': 'staff',
       'action': 'PATIENT_DISCONTINUED',
-      'entityType': 'patient',
-      'entityId': patientId,
-      'description': 'Discontinued patient $patientName and locked associated records',
-      'organizationId': organizationId,
-      'timestamp': FieldValue.serverTimestamp(),
+      'entity_type': 'patient',
+      'entity_id': patientId,
+      'description': 'Discontinued patient $patientName and locked active invoices',
+      'organization_id': organizationId,
+      'timestamp': now,
     });
-
-    await batch.commit();
   }
 
-  /// Reactivate a discontinued patient and restore their associated invoices
   Future<void> reactivatePatient({
     required String patientId,
     required String patientName,
@@ -297,88 +193,87 @@ class PatientRepository {
     required String organizationId,
     String? userName,
   }) async {
-    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
 
-    batch.update(_firestore.collection('patients').doc(patientId), {
-      'isDiscontinued': false,
-      'status': 'active',
-      'reactivatedAt': FieldValue.serverTimestamp(),
-      'reactivatedBy': userId,
-    });
+    await _supabase.from('patients').update({
+      'is_discontinued': false,
+      'discontinued_at': null,
+      'discontinued_by': null,
+      'reactivated_at': now,
+      'reactivated_by': userId,
+    }).eq('id', patientId);
 
-    // Restore all associated invoices
-    final invoicesSnap = await _firestore
-        .collection('invoices')
-        .where('patientId', isEqualTo: patientId)
-        .get();
+    await _supabase.from('invoices').update({
+      'is_discontinued': false,
+    }).eq('patient_id', patientId);
 
-    for (final doc in invoicesSnap.docs) {
-      batch.update(doc.reference, {
-        'isDiscontinued': false,
-        'reactivatedAt': FieldValue.serverTimestamp(),
-        'reactivatedBy': userId,
-      });
-    }
-
-    // Log activity
-    final activityRef = _firestore.collection('activities').doc();
-    batch.set(activityRef, {
-      'userId': userId,
-      'userName': (userName != null && userName.isNotEmpty) ? userName : 'User',
+    await _supabase.from('activities').insert({
+      'user_id': userId,
+      'user_name': userName ?? 'Staff',
+      'role': 'staff',
       'action': 'PATIENT_REACTIVATED',
-      'entityType': 'patient',
-      'entityId': patientId,
-      'description': 'Reactivated patient $patientName and restored associated records',
-      'organizationId': organizationId,
-      'timestamp': FieldValue.serverTimestamp(),
+      'entity_type': 'patient',
+      'entity_id': patientId,
+      'description': 'Reactivated patient $patientName and unlocked invoices',
+      'organization_id': organizationId,
+      'timestamp': now,
     });
-
-    await batch.commit();
   }
-  
+
+  Future<Patient?> getPatientById(String patientId) async {
+    final res = await _supabase
+        .from('patients')
+        .select()
+        .eq('id', patientId)
+        .maybeSingle();
+    if (res == null) return null;
+    return Patient.fromMap(res, (res['id'] ?? '').toString());
+  }
+
   /// Read-only preview of next MR Number (does NOT increment database counter)
   Future<String> previewNextMRNumber() async {
-    final docRef = _firestore.collection('system_metrics').doc('mr_counter');
-    final snapshot = await docRef.get();
-    int current = 4000;
-    if (snapshot.exists) {
-      current = snapshot.data()?['current'] ?? 4000;
+    try {
+      final doc = await _supabase.from('system_metrics').select('data').eq('id', 'mr_counter').maybeSingle();
+      int current = 4000;
+      if (doc != null && doc['data'] != null && doc['data'] is Map) {
+        current = (doc['data']['current'] as num?)?.toInt() ?? 4000;
+      }
+      final nextCount = current + 1;
+      final now = DateTime.now();
+      final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      return 'SHHC-$dateStr-$nextCount';
+    } catch (_) {
+      final now = DateTime.now();
+      final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      return 'SHHC-$dateStr-4001';
     }
-    final nextCount = current + 1;
+  }
+
+  /// Atomically / sequentially gets the next MR Number and increments counter
+  Future<String> getNextMRNumber() async {
+    int nextCount = 4001;
+    try {
+      final doc = await _supabase.from('system_metrics').select('data').eq('id', 'mr_counter').maybeSingle();
+      int current = 4000;
+      if (doc != null && doc['data'] != null && doc['data'] is Map) {
+        current = (doc['data']['current'] as num?)?.toInt() ?? 4000;
+      }
+      nextCount = current + 1;
+      await _supabase.from('system_metrics').upsert({
+        'id': 'mr_counter',
+        'data': {'current': nextCount},
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+
     final now = DateTime.now();
     final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     return 'SHHC-$dateStr-$nextCount';
   }
 
-  Future<String> getNextMRNumber() async {
-    final docRef = _firestore.collection('system_metrics').doc('mr_counter');
-    
-    final int nextCount = await _firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(docRef);
-      if (!snapshot.exists) {
-        transaction.set(docRef, {'current': 4000});
-        return 4000;
-      } else {
-        int current = snapshot.data()?['current'] ?? 4000;
-        int next = current + 1;
-        transaction.update(docRef, {'current': next});
-        return next;
-      }
-    });
-    
-    final now = DateTime.now();
-    final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    return 'SHHC-$dateStr-$nextCount';
+  Future<void> syncSystemMetrics({String organizationId = 'default'}) async {
+    try {
+      await _supabase.rpc('get_financial_metrics', params: {'p_org_id': organizationId});
+    } catch (_) {}
   }
 }
-
-// Providers for UI consumption
-final staffPatientsProvider = StreamProvider<List<Patient>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
-  return ref.watch(patientRepositoryProvider).watchStaffPatients(user.uid);
-});
-
-final allPatientsProvider = StreamProvider.family<List<Patient>, bool>((ref, includeDeleted) {
-  return ref.watch(patientRepositoryProvider).watchAllPatients(includeDeleted: includeDeleted);
-});

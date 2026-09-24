@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -18,12 +18,13 @@ class InvoiceExporter {
 
     if (patient == null && invoice.patientId.isNotEmpty) {
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection('patients')
-            .doc(invoice.patientId)
-            .get();
-        if (doc.exists) {
-          patient = Patient.fromMap(doc.data()!, doc.id);
+        final doc = await Supabase.instance.client
+            .from('patients')
+            .select()
+            .eq('id', invoice.patientId)
+            .maybeSingle();
+        if (doc != null) {
+          patient = Patient.fromMap(doc, (doc['id'] ?? '').toString());
         }
       } catch (_) {}
     }

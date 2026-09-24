@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Cloud Firestore removed - using Supabase
+
 
 import '../../../register/presentation/pages/register_page.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -18,20 +19,24 @@ final recentUserHighlightProvider = NotifierProvider<RecentUserHighlightNotifier
 );
 
 final allUsersProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('users')
-      .snapshots()
-      .map((snapshot) => snapshot.docs
-          .map((doc) => {...doc.data(), 'uid': doc.id})
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase
+      .from('users')
+      .stream(primaryKey: ['id'])
+      .map((rows) => rows
           .where((user) {
-            final isDeleted = user['isDeleted'] == true;
-            final isInternalAccount = user['isInternalAccount'] == true;
-            final isHidden = user['isHidden'] == true;
-
-            // Always hide hard-deleted users and internal/hidden accounts
+            final isDeleted = user['is_deleted'] == true || user['isDeleted'] == true;
+            final isInternalAccount = user['is_internal_account'] == true || user['isInternalAccount'] == true;
+            final isHidden = user['is_hidden'] == true || user['isHidden'] == true;
             if (isDeleted || isInternalAccount || isHidden) return false;
-
             return true;
+          })
+          .map((user) => {
+            ...user,
+            'uid': (user['id'] ?? '').toString(),
+            'isDeleted': user['is_deleted'] ?? false,
+            'isInternalAccount': user['is_internal_account'] ?? false,
+            'isHidden': user['is_hidden'] ?? false,
           })
           .toList());
 });
@@ -355,10 +360,10 @@ class _UserDetailsModalState extends ConsumerState<_UserDetailsModal> {
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
         'role': _selectedRole,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'updated_at': DateTime.now().toIso8601String(),
       };
 
-      await FirebaseFirestore.instance.collection('users').doc(targetUid).update(updateData);
+      await ref.read(supabaseClientProvider).from('users').update(updateData).eq('id', targetUid);
 
       if (mounted) {
         _passwordController.clear();
@@ -454,8 +459,14 @@ class _UserDetailsModalState extends ConsumerState<_UserDetailsModal> {
 
   @override
   Widget build(BuildContext context) {
-    final createdAt = widget.user['createdAt'] as Timestamp?;
-    final dateStr = createdAt != null ? createdAt.toDate().toString() : 'N/A';
+    final rawCreated = widget.user['created_at'] ?? widget.user['createdAt'];
+    String dateStr = 'N/A';
+    if (rawCreated is String) {
+      final dt = DateTime.tryParse(rawCreated);
+      if (dt != null) dateStr = dt.toLocal().toString().split('.')[0];
+    } else if (rawCreated != null) {
+      dateStr = rawCreated.toString();
+    }
     final username = (widget.user['username'] ?? 'N/A').toString();
     final email = (widget.user['email'] ?? '').toString().isNotEmpty
         ? widget.user['email'].toString()

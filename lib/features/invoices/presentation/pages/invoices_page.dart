@@ -6,7 +6,7 @@ import '../../data/invoice_repository.dart';
 import '../invoice_export_page.dart';
 import '../invoice_form_screen.dart';
 import '../../../patients/data/patient_repository.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/invoice_details_dialog.dart';
 
 class RecentInvoiceHighlightNotifier extends Notifier<String?> {
@@ -528,12 +528,13 @@ class _PatientMrTextState extends State<_PatientMrText> {
       return _cache[widget.patientId]!;
     }
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('patients')
-          .doc(widget.patientId)
-          .get();
-      if (doc.exists && doc.data() != null) {
-        final mr = doc.data()!['mrNumber']?.toString() ?? 'Unknown';
+      final doc = await Supabase.instance.client
+          .from('patients')
+          .select('mr_number')
+          .eq('id', widget.patientId)
+          .maybeSingle();
+      if (doc != null) {
+        final mr = (doc['mr_number'] ?? doc['mrNumber'])?.toString() ?? 'Unknown';
         _cache[widget.patientId] = mr;
         return mr;
       }

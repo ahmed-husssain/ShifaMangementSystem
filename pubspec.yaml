@@ -38,6 +38,7 @@ dependencies:
   firebase_auth: ^6.5.4
   cloud_firestore: ^6.6.0
   cloud_functions: ^6.3.3
+  supabase_flutter: ^2.8.3
   pdf: ^3.13.0
   printing: ^5.15.0
   path_provider: ^2.1.6

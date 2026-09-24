@@ -68,49 +68,63 @@ class Patient {
     this.scheduledReminders = const [],
   });
 
+  static DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is Timestamp) return val.toDate();
+    if (val is String) return DateTime.tryParse(val);
+    if (val is Map && val.containsKey('_seconds')) {
+      return DateTime.fromMillisecondsSinceEpoch((val['_seconds'] as int) * 1000);
+    }
+    return null;
+  }
+
   factory Patient.fromMap(Map<String, dynamic> data, String documentId) {
     List<ScheduledNotification> reminders = [];
-    if (data['scheduledReminders'] != null && data['scheduledReminders'] is List) {
-      for (final item in (data['scheduledReminders'] as List)) {
+    final rawReminders = data['scheduledReminders'] ?? data['scheduled_reminders'];
+    if (rawReminders != null && rawReminders is List) {
+      for (final item in rawReminders) {
         if (item is Map) {
           try {
-            reminders.add(ScheduledNotification.fromMap(item, (item['id'] ?? '').toString()));
+            reminders.add(ScheduledNotification.fromMap(Map<String, dynamic>.from(item), (item['id'] ?? '').toString()));
           } catch (_) {}
         }
       }
     }
 
+    final now = DateTime.now();
+
     return Patient(
       patientId: documentId,
-      mrNumber: data['mrNumber'] ?? '',
-      patientName: data['patientName'] ?? '',
-      cnic: data['cnic'] ?? '',
-      phone: data['phone'] ?? '',
-      address: data['address'] ?? '',
-      diagnosis: data['diagnosis'] ?? '',
-      doctor: data['doctor'] ?? '',
-      nurse: data['nurse'] ?? '',
-      caretaker: data['caretaker'] ?? '',
-      selectedServices: List<Map<String, dynamic>>.from(data['selectedServices'] ?? []),
-      monthlyServiceCost: (data['monthlyServiceCost'] ?? 0.0).toDouble(),
-      patientAmount: (data['patientAmount'] ?? 0.0).toDouble(),
-      staffPayment: (data['staffPayment'] ?? 0.0).toDouble(),
+      mrNumber: (data['mrNumber'] ?? data['mr_number'] ?? '').toString(),
+      patientName: (data['patientName'] ?? data['patient_name'] ?? '').toString(),
+      cnic: (data['cnic'] ?? '').toString(),
+      phone: (data['phone'] ?? '').toString(),
+      address: (data['address'] ?? '').toString(),
+      diagnosis: (data['diagnosis'] ?? '').toString(),
+      doctor: (data['doctor'] ?? '').toString(),
+      nurse: (data['nurse'] ?? '').toString(),
+      caretaker: (data['caretaker'] ?? '').toString(),
+      selectedServices: List<Map<String, dynamic>>.from(data['selectedServices'] ?? data['selected_services'] ?? []),
+      monthlyServiceCost: (data['monthlyServiceCost'] ?? data['monthly_service_cost'] ?? 0.0).toDouble(),
+      patientAmount: (data['patientAmount'] ?? data['patient_amount'] ?? 0.0).toDouble(),
+      staffPayment: (data['staffPayment'] ?? data['staff_payment'] ?? 0.0).toDouble(),
       profit: (data['profit'] ?? 0.0).toDouble(),
       days: (data['days'] is num ? (data['days'] as num).toInt() : int.tryParse(data['days']?.toString() ?? '0') ?? 0),
-      assignedStaffId: data['assignedStaffId'] ?? '',
-      organizationId: data['organizationId'] ?? 'default',
-      createdBy: data['createdBy'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedBy: data['updatedBy'] ?? '',
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isDeleted: data['isDeleted'] ?? false,
-      deletedAt: (data['deletedAt'] as Timestamp?)?.toDate(),
-      deletedBy: data['deletedBy'],
-      isDiscontinued: data['isDiscontinued'] ?? (data['status'] == 'discontinued'),
-      discontinuedAt: (data['discontinuedAt'] as Timestamp?)?.toDate(),
-      discontinuedBy: data['discontinuedBy'],
-      reactivatedAt: (data['reactivatedAt'] as Timestamp?)?.toDate(),
-      reactivatedBy: data['reactivatedBy'],
+      assignedStaffId: (data['assignedStaffId'] ?? data['assigned_staff_id'] ?? '').toString(),
+      organizationId: (data['organizationId'] ?? data['organization_id'] ?? 'default').toString(),
+      createdBy: (data['createdBy'] ?? data['created_by'] ?? '').toString(),
+      createdAt: _parseDate(data['createdAt'] ?? data['created_at']) ?? now,
+      updatedBy: (data['updatedBy'] ?? data['updated_by'] ?? '').toString(),
+      updatedAt: _parseDate(data['updatedAt'] ?? data['updated_at']) ?? now,
+      isDeleted: data['isDeleted'] ?? data['is_deleted'] ?? false,
+      deletedAt: _parseDate(data['deletedAt'] ?? data['deleted_at']),
+      deletedBy: data['deletedBy'] ?? data['deleted_by'],
+      isDiscontinued: data['isDiscontinued'] ?? data['is_discontinued'] ?? (data['status'] == 'discontinued'),
+      discontinuedAt: _parseDate(data['discontinuedAt'] ?? data['discontinued_at']),
+      discontinuedBy: data['discontinuedBy'] ?? data['discontinued_by'],
+      reactivatedAt: _parseDate(data['reactivatedAt'] ?? data['reactivated_at']),
+      reactivatedBy: data['reactivatedBy'] ?? data['reactivated_by'],
       scheduledReminders: reminders,
     );
   }
@@ -147,6 +161,42 @@ class Patient {
       'reactivatedAt': reactivatedAt,
       'reactivatedBy': reactivatedBy,
       'scheduledReminders': scheduledReminders.map((r) => r.toMap()).toList(),
+    };
+  }
+
+  Map<String, dynamic> toSupabaseMap() {
+    return {
+      'id': patientId,
+      'patient_name': patientName,
+      'mr_number': mrNumber,
+      'cnic': cnic,
+      'phone': phone,
+      'address': address,
+      'diagnosis': diagnosis,
+      'doctor': doctor,
+      'nurse': nurse,
+      'caretaker': caretaker,
+      'selected_services': selectedServices,
+      'monthly_service_cost': monthlyServiceCost,
+      'patient_amount': patientAmount,
+      'staff_payment': staffPayment,
+      'profit': profit,
+      'days': days,
+      'assigned_staff_id': assignedStaffId,
+      'organization_id': organizationId,
+      'created_by': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'updated_by': updatedBy,
+      'updated_at': updatedAt.toIso8601String(),
+      'is_deleted': isDeleted,
+      'deleted_at': deletedAt?.toIso8601String(),
+      'deleted_by': deletedBy,
+      'is_discontinued': isDiscontinued,
+      'discontinued_at': discontinuedAt?.toIso8601String(),
+      'discontinued_by': discontinuedBy,
+      'reactivated_at': reactivatedAt?.toIso8601String(),
+      'reactivated_by': reactivatedBy,
+      'scheduled_reminders': scheduledReminders.map((r) => r.toMap()).toList(),
     };
   }
 }

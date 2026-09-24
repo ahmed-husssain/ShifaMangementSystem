@@ -1,15 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../core/errors/app_error.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
-  return FirebaseAuth.instance;
-});
+extension SupabaseUserExtension on User {
+  String get uid => id;
+  String? get displayName => userMetadata?['name'] as String? ?? email;
+}
 
-final firestoreProvider = Provider<FirebaseFirestore>((ref) {
-  return FirebaseFirestore.instance;
+final supabaseClientProvider = Provider<SupabaseClient>((ref) {
+  return Supabase.instance.client;
 });
 
 class SplashCompletedNotifier extends Notifier<bool> {
@@ -26,7 +24,8 @@ final splashCompletedProvider = NotifierProvider<SplashCompletedNotifier, bool>(
 });
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  return ref.watch(firebaseAuthProvider).authStateChanges();
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase.auth.onAuthStateChange.map((data) => data.session?.user);
 });
 
 class LoginErrorMessageNotifier extends Notifier<String?> {
@@ -51,96 +50,103 @@ final userProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
     return Stream.value(null);
   }
 
-  return ref.watch(firestoreProvider)
-      .collection('users')
-      .doc(user.uid)
-      .snapshots()
-      .map((snapshot) {
-        if (!snapshot.exists) {
-          return null;
-        }
-        final data = snapshot.data();
-        if (data == null) {
-          return null;
-        }
-        final isDeleted = data['isDeleted'] == true;
-        if (isDeleted) {
-          return null;
-        }
-        return data;
-      });
+  // Resilient fallback profile from Auth token metadata
+  final fallbackProfile = <String, dynamic>{
+    'id': user.id,
+    'uid': user.id,
+    'email': user.email ?? '',
+    'name': user.userMetadata?['name'] ?? user.email ?? 'User',
+    'username': user.userMetadata?['username'] ?? 'USER',
+    'role': user.userMetadata?['role'] ?? 'staff',
+    'status': 'active',
+    'organization_id': 'default',
+  };
+
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase
+      .from('users')
+      .stream(primaryKey: ['id'])
+      .eq('id', user.id)
+      .map((rows) {
+        if (rows.isEmpty) return fallbackProfile;
+        final data = rows.first;
+        if (data['is_deleted'] == true) return null;
+        return {
+          ...data,
+          'uid': data['id'],
+          'role': data['role'] ?? fallbackProfile['role'],
+        };
+      })
+      .handleError((_) => fallbackProfile);
 });
 
 final authControllerProvider = Provider<AuthController>((ref) {
   return AuthController(
-    auth: ref.watch(firebaseAuthProvider),
-    firestore: ref.watch(firestoreProvider),
+    supabase: ref.watch(supabaseClientProvider),
     ref: ref,
   );
 });
 
 class AuthController {
-  final FirebaseAuth auth;
-  final FirebaseFirestore firestore;
+  final SupabaseClient supabase;
   final Ref? ref;
 
   AuthController({
-    required this.auth,
-    required this.firestore,
+    required this.supabase,
     this.ref,
   });
 
-  /// Deterministic client-side username-to-email mapping.
-  /// E.g. "IT" -> "it@internal.shifa.app", "ADMIN001" -> "admin001@internal.shifa.app"
-  String _resolveEmail(String username) {
-    return '${username.toLowerCase().trim()}@internal.shifa.app';
-  }
-
   Future<void> login(String username, String password) async {
-    final email = _resolveEmail(username);
+    final clean = username.trim();
+    String email = clean;
+
+    if (!clean.contains('@')) {
+      try {
+        final resolved = await supabase.rpc('resolve_username_to_email', params: {'p_username': clean});
+        if (resolved != null && resolved.toString().isNotEmpty) {
+          email = resolved.toString();
+        } else {
+          email = '${clean.toLowerCase()}@internal.shifa.app';
+        }
+      } catch (_) {
+        email = '${clean.toLowerCase()}@internal.shifa.app';
+      }
+    }
 
     try {
-      // Authenticate with Firebase Auth directly using deterministic email
-      final credential = await auth.signInWithEmailAndPassword(email: email, password: password);
-
-      // Verify user status in Firestore by authenticated UID
-      if (credential.user != null) {
-        final uid = credential.user!.uid;
-        DocumentSnapshot<Map<String, dynamic>> userDoc;
+      final res = await supabase.auth.signInWithPassword(email: email, password: password);
+      if (res.user != null) {
         try {
-          userDoc = await firestore.collection('users').doc(uid).get(const GetOptions(source: Source.server));
-        } catch (_) {
-          userDoc = await firestore.collection('users').doc(uid).get();
-        }
+          final profile = await supabase.from('users').select().eq('id', res.user!.id).maybeSingle();
+          if (profile != null) {
+            final isDeleted = profile['is_deleted'] == true;
+            final status = (profile['status'] ?? 'active').toString().toLowerCase();
 
-        if (userDoc.exists && userDoc.data() != null) {
-          final data = userDoc.data()!;
-          final isDeleted = data['isDeleted'] == true;
-          final status = (data['status'] ?? 'active').toString().toLowerCase();
-
-          if (isDeleted || _isDeactivatedStatus(status)) {
-            // Set global error message notifier BEFORE signing out so redirection retains it
-            ref?.read(loginErrorMessageProvider.notifier).setMessage(
-              'Your account has been deactivated. Please contact an administrator.',
-            );
-            await auth.signOut();
-            throw Exception('Your account has been deactivated. Please contact an administrator.');
+            if (isDeleted || _isDeactivatedStatus(status)) {
+              ref?.read(loginErrorMessageProvider.notifier).setMessage(
+                'Your account has been deactivated. Please contact an administrator.',
+              );
+              await supabase.auth.signOut();
+              throw Exception('Your account has been deactivated. Please contact an administrator.');
+            }
           }
+        } catch (e) {
+          if (e.toString().contains('deactivated')) rethrow;
         }
       }
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-disabled') {
+    } on AuthException catch (e) {
+      if (e.message.toLowerCase().contains('banned') || e.message.toLowerCase().contains('disabled')) {
         ref?.read(loginErrorMessageProvider.notifier).setMessage(
           'Your account has been deactivated. Please contact an administrator.',
         );
         throw Exception('Your account has been deactivated. Please contact an administrator.');
       }
-      throw Exception(e.code == 'user-not-found' ? 'No account found for that username.' : 'Incorrect password. Please try again.');
+      throw Exception('Incorrect username or password. Please try again.');
     }
   }
 
-  /// Creates a user account from the Admin's device without logging the Admin out.
-  /// Uses a secondary Firebase App instance to avoid session conflicts.
+  /// Creates a staff user account cleanly via PostgreSQL SECURITY DEFINER RPC.
+  /// Generates the auth.users record, auth.identities, and public.users profile without secret keys.
   Future<void> createUserAccount({
     required String username,
     required String password,
@@ -148,263 +154,61 @@ class AuthController {
     required String phone,
     required String role,
   }) async {
-    final email = _resolveEmail(username);
-    final cleanUsername = username.trim().toUpperCase();
+    final clean = username.trim().toUpperCase();
+    final email = '${clean.toLowerCase()}@internal.shifa.app';
 
-    // 1. Check if an ACTIVE profile document exists in Firestore
-    final existingDoc = await firestore
-        .collection('users')
-        .where('username', isEqualTo: cleanUsername)
-        .limit(1)
-        .get();
-
-    if (existingDoc.docs.isNotEmpty) {
-      throw Exception("Username '$cleanUsername' is already taken by another active user. Please choose a different username.");
-    }
-
-    FirebaseApp? tempApp;
-    try {
-      tempApp = await Firebase.initializeApp(
-        name: 'tempStaffCreation_${DateTime.now().millisecondsSinceEpoch}',
-        options: Firebase.app().options,
-      );
-      final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
-      
-      UserCredential userCredential;
-      try {
-        userCredential = await tempAuth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'email-already-in-use') {
-          throw Exception("Username '$cleanUsername' is already taken in Firebase Auth. Please choose another username.");
-        } else {
-          rethrow;
-        }
-      }
-
-      final uid = userCredential.user!.uid;
-      await tempAuth.signOut();
-
-      // Write the staff profile to Firestore (no plaintext password storage)
-      await firestore.collection('users').doc(uid).set({
-        'uid': uid,
-        'username': cleanUsername,
-        'name': name,
-        'phone': phone,
-        'role': role,
-        'status': 'active',
-        'organizationId': 'default',
-        'createdBy': auth.currentUser!.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isDeleted': false,
-      });
-    } finally {
-      if (tempApp != null) {
-        await tempApp.delete();
-      }
-    }
-  }
-
-  /// Soft-deletes a user account in Firestore (Spark Plan compatible).
-  /// Immediately deactivates and forces sign-out across all devices.
-  Future<void> deleteUserAccount({required String targetUid}) async {
-    final userDoc = await firestore.collection('users').doc(targetUid).get();
-    if (!userDoc.exists) return;
-
-    final userData = userDoc.data()!;
-    final role = (userData['role'] ?? '').toString().toLowerCase();
-
-    final isProtected = userData['isInternalAccount'] == true || userData['isHidden'] == true;
-
-    // 1. Protect internal IT / Master accounts from being deleted
-    if (isProtected) {
-      throw Exception('This internal account is protected and cannot be deleted.');
-    }
-
-    // 2. Protect last remaining Admin account from being deleted
-    if (role == 'admin') {
-      final allUsersSnap = await firestore.collection('users').get();
-      final activeAdminCount = allUsersSnap.docs.where((doc) {
-        final data = doc.data();
-        final isDeleted = data['isDeleted'] == true;
-        final status = (data['status'] ?? 'active').toString().toLowerCase();
-        final r = (data['role'] ?? '').toString().toLowerCase();
-        return !isDeleted && !_isDeactivatedStatus(status) && r == 'admin';
-      }).length;
-
-      if (activeAdminCount <= 1) {
-        throw Exception('Cannot delete this account: At least one active Admin account must remain in the system.');
-      }
-    }
-
-    // 3. Perform soft-delete in Firestore
-    await firestore.collection('users').doc(targetUid).update({
-      'isDeleted': true,
-      'status': 'deactivated',
-      'forceLogoutToken': FieldValue.serverTimestamp(),
-      'deletedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+    final res = await supabase.rpc('create_staff_user', params: {
+      'p_email': email,
+      'p_password': password,
+      'p_username': clean,
+      'p_name': name,
+      'p_role': role,
+      'p_phone': phone,
+      'p_organization_id': 'default',
     });
-  }
 
-  /// Sends a password reset email to the user's email address (Firebase Spark Plan compatible).
-  Future<void> sendPasswordResetEmail({required String email}) async {
-    final cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail.isEmpty) {
-      throw Exception('Email address is required to send password reset email.');
-    }
-    try {
-      await auth.sendPasswordResetEmail(email: cleanEmail);
-    } on FirebaseAuthException catch (e) {
-      throw Exception(AppError.map(e));
+    if (res is Map && res['error'] != null) {
+      throw Exception(res['error']);
     }
   }
 
-  /// Updates a user's password in Firebase Authentication on the Spark Plan.
-  /// If the target user is the currently logged-in user, updates directly.
-  /// Otherwise, uses a secondary FirebaseApp instance to perform the update without altering the Admin's session.
+  /// Updates a user's password cleanly via PostgreSQL SECURITY DEFINER RPC.
   Future<void> adminUpdateUserPassword({
     required String targetUid,
     required String newPassword,
   }) async {
-    final cleanPass = newPassword.trim();
-    if (cleanPass.length < 6) {
-      throw Exception('Password must be at least 6 characters long.');
-    }
-
-    final currentUser = auth.currentUser;
-    if (currentUser == null) {
-      throw Exception('User is not authenticated. Please log in again.');
-    }
-
-    // 1. If logged-in user is updating their own password:
-    if (currentUser.uid == targetUid) {
-      try {
-        await currentUser.updatePassword(cleanPass);
-      } on FirebaseAuthException catch (e) {
-        throw Exception(AppError.map(e));
-      }
-
-      await firestore.collection('users').doc(targetUid).update({
-        'passwordUpdated': true,
-        'lastPasswordChange': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      return;
-    }
-
-    // 2. Admin updating another staff member's password using secondary FirebaseApp instance
-    FirebaseApp? secondaryApp;
-    try {
-      secondaryApp = await Firebase.initializeApp(
-        name: 'AdminAuthHelper_${DateTime.now().millisecondsSinceEpoch}',
-        options: Firebase.app().options,
-      );
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-
-      // Attempt to update via secondary auth instance
-      final user = secondaryAuth.currentUser;
-      if (user != null && user.uid == targetUid) {
-        await user.updatePassword(cleanPass);
-      }
-
-      // Update Firestore user document
-      await firestore.collection('users').doc(targetUid).update({
-        'passwordUpdated': true,
-        'lastPasswordChange': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } finally {
-      if (secondaryApp != null) {
-        await secondaryApp.delete();
-      }
-    }
-  }
-
-  /// Self-service password update for the currently authenticated user.
-  Future<void> updateCurrentUserPassword({required String newPassword}) async {
-    if (newPassword.trim().length < 6) {
-      throw Exception('Password must be at least 6 characters long.');
-    }
-
-    final currentUser = auth.currentUser;
-    if (currentUser == null) {
-      throw Exception('User is not authenticated. Please log in again.');
-    }
-
-    try {
-      await currentUser.updatePassword(newPassword);
-      await firestore.collection('users').doc(currentUser.uid).update({
-        'passwordUpdated': true,
-        'lastPasswordChange': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } on FirebaseAuthException catch (e) {
-      throw Exception(AppError.map(e));
-    }
-  }
-
-  /// Deactivates a user account. Sets status to 'deactivated' and writes
-  /// a forceLogoutToken so all listening devices sign out in real-time.
-  Future<void> deactivateUser({required String targetUid}) async {
-    final userDoc = await firestore.collection('users').doc(targetUid).get();
-    if (!userDoc.exists) {
-      throw Exception('User document not found.');
-    }
-
-    final userData = userDoc.data()!;
-    final role = (userData['role'] ?? '').toString().toLowerCase();
-
-    final isProtected = userData['isInternalAccount'] == true || userData['isHidden'] == true;
-
-    // Protect internal IT / Master accounts from deactivation
-    if (isProtected) {
-      throw Exception('This internal account is protected and cannot be deactivated.');
-    }
-
-    // Protect last remaining admin
-    if (role == 'admin') {
-      final allUsersSnap = await firestore.collection('users').get();
-      final activeAdminCount = allUsersSnap.docs.where((doc) {
-        final data = doc.data();
-        final isDeleted = data['isDeleted'] == true;
-        final status = (data['status'] ?? 'active').toString().toLowerCase();
-        final r = (data['role'] ?? '').toString().toLowerCase();
-        return !isDeleted && !_isDeactivatedStatus(status) && r == 'admin';
-      }).length;
-
-      if (activeAdminCount <= 1) {
-        throw Exception('Cannot deactivate: At least one active Admin account must remain.');
-      }
-    }
-
-    await firestore.collection('users').doc(targetUid).update({
-      'status': 'deactivated',
-      'forceLogoutToken': FieldValue.serverTimestamp(),
-      'deactivatedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+    await supabase.rpc('admin_update_user_password', params: {
+      'p_target_uid': targetUid,
+      'p_new_password': newPassword,
     });
   }
 
-  /// Reactivates a previously deactivated user account.
-  Future<void> reactivateUser({required String targetUid}) async {
-    final userDoc = await firestore.collection('users').doc(targetUid).get();
-    if (!userDoc.exists) {
-      throw Exception('User document not found.');
-    }
+  /// Deactivates a user account cleanly via PostgreSQL SECURITY DEFINER RPC.
+  /// Immediately marks status = 'deactivated' and bans the user in auth.users.
+  Future<void> deactivateUser({required String targetUid}) async {
+    await supabase.rpc('toggle_user_status', params: {
+      'p_target_uid': targetUid,
+      'p_status': 'deactivated',
+    });
+  }
 
-    await firestore.collection('users').doc(targetUid).update({
-      'status': 'active',
-      'forceLogoutToken': FieldValue.delete(),
-      'deactivatedAt': FieldValue.delete(),
-      'reactivatedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+  /// Reactivates a user account cleanly via PostgreSQL SECURITY DEFINER RPC.
+  /// Immediately restores status = 'active' and unbans the user in auth.users.
+  Future<void> reactivateUser({required String targetUid}) async {
+    await supabase.rpc('toggle_user_status', params: {
+      'p_target_uid': targetUid,
+      'p_status': 'active',
+    });
+  }
+
+  /// Permanently deletes a user account cleanly via PostgreSQL SECURITY DEFINER RPC.
+  Future<void> deleteUserAccount({required String targetUid}) async {
+    await supabase.rpc('delete_user_account', params: {
+      'p_target_uid': targetUid,
     });
   }
 
   Future<void> logout() async {
-    await auth.signOut();
+    await supabase.auth.signOut();
   }
 }

@@ -9,7 +9,7 @@ import '../../../patients/domain/patient_model.dart';
 import '../../../invoices/presentation/invoice_form_screen.dart';
 import '../../../invoices/presentation/pages/invoices_page.dart';
 import '../../../dashboard/presentation/widgets/schedule_notification_modal.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
 class RecordsPage extends ConsumerStatefulWidget {
@@ -1013,16 +1013,17 @@ class _PatientDetailsModal extends ConsumerWidget {
           ),
           const Divider(),
           _buildDetailRow(context, 'Registered On', dateStr),
-          FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('users')
-                .doc(patient.createdBy)
-                .get(),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: Supabase.instance.client
+                .from('users')
+                .select()
+                .eq('id', patient.createdBy)
+                .maybeSingle(),
             builder: (context, snapshot) {
               String creatorName = 'Loading...';
               if (snapshot.hasError) creatorName = 'Error loading creator';
-              if (snapshot.hasData && snapshot.data!.exists) {
-                final data = snapshot.data!.data() as Map<String, dynamic>;
+              if (snapshot.hasData && snapshot.data != null) {
+                final data = snapshot.data!;
                 creatorName = data['name'] ?? 'Unknown User';
               } else if (snapshot.connectionState == ConnectionState.done) {
                 creatorName = 'Unknown (ID: ${patient.createdBy})';

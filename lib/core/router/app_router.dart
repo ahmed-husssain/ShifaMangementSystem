@@ -1,4 +1,3 @@
-﻿import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/providers/auth_provider.dart';
@@ -19,8 +18,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final userProfile = ref.watch(userProfileProvider);
   final splashCompleted = ref.watch(splashCompletedProvider);
 
-  bool isHandlingSignOut = false;
-
   return GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) {
@@ -31,59 +28,36 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return isSplash ? null : '/splash';
       }
 
-      if (authState.isLoading || userProfile.isLoading) {
+      if (authState.isLoading) {
         return '/splash';
       }
 
-      if (authState.hasError || userProfile.hasError) {
-        // Sign out to clear bad state and prevent infinite redirect loops
-        if (!isHandlingSignOut) {
-          isHandlingSignOut = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(firebaseAuthProvider).signOut();
-          });
-        }
-        return '/login';
-      }
-
       final user = authState.value;
-
       if (user == null) {
         return isLoggingIn ? null : '/login';
       }
 
-      final profile = userProfile.value;
-      if (profile == null) {
-        if (userProfile.hasValue) {
-          // Profile document doesn't exist in Firestore, sign out
-          if (!isHandlingSignOut) {
-            isHandlingSignOut = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              ref.read(firebaseAuthProvider).signOut();
-            });
-          }
-          return '/login';
-        }
+      // If user is logged in, wait for profile or use fallback
+      if (userProfile.isLoading && !userProfile.hasValue) {
         return '/splash';
       }
 
-      // Check if the account has been deactivated (works across all devices
-      // because userProfileProvider is a real-time Firestore stream)
+      final profile = userProfile.value;
+      if (profile == null) {
+        return isLoggingIn ? null : '/login';
+      }
+
+      // Check if the account has been deactivated
       final status = (profile['status'] ?? 'active').toString().toLowerCase();
       if (status == 'deactivated' || status == 'disabled' || status == 'inactive') {
-        if (!isHandlingSignOut) {
-          isHandlingSignOut = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(loginErrorMessageProvider.notifier).setMessage(
-              'Your account has been deactivated. Please contact an administrator.',
-            );
-            ref.read(firebaseAuthProvider).signOut();
-          });
-        }
+        ref.read(loginErrorMessageProvider.notifier).setMessage(
+          'Your account has been deactivated. Please contact an administrator.',
+        );
+        ref.read(authControllerProvider).logout();
         return '/login';
       }
 
-      final role = profile['role']; 
+      final role = (profile['role'] ?? 'staff').toString().toLowerCase();
 
       if (isLoggingIn || state.matchedLocation == '/' || state.matchedLocation == '/splash') {
          return '/dashboard';

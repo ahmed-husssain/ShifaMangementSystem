@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Cloud Firestore removed
 import 'package:intl/intl.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../analytics/presentation/activity_feed_widget.dart';
@@ -18,7 +18,7 @@ final systemMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final patients = patientsAsync.value ?? [];
   final invoices = invoicesAsync.value ?? [];
 
-  final totalPatients = patients.length;
+  final totalActivePatients = patients.where((p) => !p.isDiscontinued && !p.isDeleted).length;
   final patientMap = {for (final p in patients) p.patientId: p};
 
   double totalRevenue = 0.0;
@@ -50,15 +50,15 @@ final systemMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
 
   final netProfit = totalRevenue - totalPayout;
 
-  return FirebaseFirestore.instance
-      .collection('users')
-      .snapshots()
-      .map((staffSnapshot) {
-    final staffCount = staffSnapshot.docs.where((doc) {
-      final data = doc.data();
-      final isDeleted = data['isDeleted'] == true;
-      final isInternalAccount = data['isInternalAccount'] == true;
-      final isHidden = data['isHidden'] == true;
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase
+      .from('users')
+      .stream(primaryKey: ['id'])
+      .map((rows) {
+    final staffCount = rows.where((data) {
+      final isDeleted = data['is_deleted'] == true || data['isDeleted'] == true;
+      final isInternalAccount = data['is_internal_account'] == true || data['isInternalAccount'] == true;
+      final isHidden = data['is_hidden'] == true || data['isHidden'] == true;
       final role = (data['role'] ?? '').toString().toLowerCase();
 
       if (isDeleted || isInternalAccount || isHidden) return false;
@@ -66,7 +66,7 @@ final systemMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
     }).length;
 
     return {
-      'totalPatients': totalPatients,
+      'totalPatients': totalActivePatients,
       'totalRevenue': netProfit,
       'totalInvoices': invoices.where((i) => !i.isDeleted).length,
       'totalStaff': staffCount,
@@ -82,7 +82,7 @@ final staffMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final patients = patientsAsync.value ?? [];
   final invoices = invoicesAsync.value ?? [];
 
-  final totalPatients = patients.length;
+  final totalActivePatients = patients.where((p) => !p.isDiscontinued && !p.isDeleted).length;
   final patientMap = {for (final p in patients) p.patientId: p};
 
   double totalRevenue = 0.0;
@@ -115,7 +115,7 @@ final staffMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final netProfit = totalRevenue - totalPayout;
 
   return Stream.value({
-    'totalPatients': totalPatients,
+    'totalPatients': totalActivePatients,
     'totalRevenue': netProfit,
     'totalInvoices': invoices.length,
   });
@@ -180,7 +180,7 @@ class _AdminDashboardView extends ConsumerWidget {
               const _PlanHealthOverviewCard(),
               const SizedBox(height: 20),
               _DashboardImageMetricCard(
-                title: 'TOTAL PATIENTS',
+                title: 'TOTAL ACTIVE PATIENTS',
                 value: '$totalPatients',
                 icon: Icons.people_alt,
                 accentColor: const Color(0xFF0056B3),
@@ -284,7 +284,7 @@ class _StaffDashboardView extends ConsumerWidget {
                 const SizedBox(height: 20),
                 // Metrics Cards
                 _DashboardImageMetricCard(
-                  title: 'MY REGISTERED PATIENTS',
+                  title: 'MY ACTIVE PATIENTS',
                   value: '$totalPatients',
                   icon: Icons.people,
                   accentColor: Colors.blueAccent,
