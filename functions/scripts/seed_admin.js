@@ -32,16 +32,16 @@ try {
 }
 
 // 2. Validate Firebase Project ID
-const EXPECTED_PROJECT_ID = "shifamangementapp";
-if (!serviceAccount.project_id || serviceAccount.project_id !== EXPECTED_PROJECT_ID) {
-  console.error(`❌ SAFETY CHECK FAILED: Project ID mismatch. Expected '${EXPECTED_PROJECT_ID}', but found '${serviceAccount.project_id}'.`);
+const ALLOWED_PROJECT_IDS = ["shifamangementapp", "shifa-demo-7023b"];
+if (!serviceAccount.project_id || !ALLOWED_PROJECT_IDS.includes(serviceAccount.project_id)) {
+  console.error(`❌ SAFETY CHECK FAILED: Project ID mismatch. Expected '${serviceAccount.project_id}', but found '${serviceAccount.project_id}'.`);
   process.exit(1);
 }
 
 // 3. Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  projectId: EXPECTED_PROJECT_ID,
+  projectId: serviceAccount.project_id,
 });
 
 const auth = admin.auth();
@@ -78,7 +78,7 @@ async function run() {
 
   console.log("===============================================================");
   console.log(`🔒 Internal IT Administrator Seeding Script [${isDryRun ? "DRY-RUN MODE" : "EXECUTE MODE"}]`);
-  console.log(`🎯 Target Project: ${EXPECTED_PROJECT_ID}`);
+  console.log(`🎯 Target Project: ${serviceAccount.project_id}`);
   console.log(`📧 Canonical Email: ${CANONICAL_CONFIG.email}`);
   console.log("===============================================================\n");
 
@@ -300,3 +300,4 @@ run().catch((err) => {
   console.error("\n❌ UNEXPECTED ERROR DURING SEEDING:", err);
   process.exit(1);
 });
+

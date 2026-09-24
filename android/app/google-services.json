@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "379856876454",
-    "project_id": "shifamangementapp",
-    "storage_bucket": "shifamangementapp.firebasestorage.app"
+    "project_number": "377763378619",
+    "project_id": "shifa-demo-7023b",
+    "storage_bucket": "shifa-demo-7023b.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:379856876454:android:ed089fbe81429bf68f5567",
+        "mobilesdk_app_id": "1:377763378619:android:214d823c01452dc098809e",
         "android_client_info": {
-          "package_name": "com.shifa.shifa_management"
+          "package_name": "com.shifa.homehealthcar"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAhoxRdnwGmslzfdHfGt0o7NmgI9z0xYWQ"
+          "current_key": "AIzaSy_PLACEHOLDER_KEY"
         }
       ],
       "services": {

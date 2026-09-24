@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/scheduled_notification_model.dart';
-
 import '../../../shared/providers/auth_provider.dart';
 
 final scheduledNotificationRepositoryProvider = Provider<ScheduledNotificationRepository>((ref) {
-  return ScheduledNotificationRepository(FirebaseFirestore.instance);
+  return ScheduledNotificationRepository(ref.watch(supabaseClientProvider));
 });
 
 final activeScheduledNotificationsProvider = StreamProvider<List<ScheduledNotification>>((ref) {
@@ -14,58 +13,52 @@ final activeScheduledNotificationsProvider = StreamProvider<List<ScheduledNotifi
     return Stream.value(<ScheduledNotification>[]);
   }
 
-  return FirebaseFirestore.instance
-      .collection('scheduled_notifications')
-      .snapshots()
-      .map((snapshot) {
-    return snapshot.docs
-        .map((doc) => ScheduledNotification.fromMap(doc.data(), doc.id))
-        .where((n) => !n.isCompleted)
-        .toList();
-  }).handleError((err) {
-    return <ScheduledNotification>[];
-  });
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase
+      .from('scheduled_notifications')
+      .stream(primaryKey: ['id'])
+      .map((rows) {
+        return rows
+            .map((doc) => ScheduledNotification.fromMap(doc, (doc['id'] ?? '').toString()))
+            .where((n) => !n.isCompleted)
+            .toList();
+      }).handleError((err) {
+        return <ScheduledNotification>[];
+      });
 });
 
 class ScheduledNotificationRepository {
-  final FirebaseFirestore _firestore;
+  final SupabaseClient _supabase;
 
-  ScheduledNotificationRepository(this._firestore);
+  ScheduledNotificationRepository(this._supabase);
 
   Future<void> addScheduledNotification(ScheduledNotification notification) async {
-    final docRef = _firestore.collection('scheduled_notifications').doc();
-    final idStr = docRef.id;
+    final idStr = notification.id.isNotEmpty ? notification.id : DateTime.now().millisecondsSinceEpoch.toString();
 
     final reminderMap = {
       'id': idStr,
-      'patientId': notification.patientId,
-      'patientName': notification.patientName,
-      'mrNumber': notification.mrNumber,
-      'phone': notification.phone,
-      'address': notification.address,
-      'reminderNote': notification.reminderNote,
-      'targetDays': notification.targetDays,
-      'scheduledFor': Timestamp.fromDate(notification.scheduledFor),
-      'createdAt': Timestamp.fromDate(notification.createdAt),
-      'createdBy': notification.createdBy,
-      'isCompleted': false,
+      'title': notification.reminderNote.isNotEmpty ? notification.reminderNote : 'Care Plan Reminder',
+      'message': 'Patient: ${notification.patientName} (${notification.mrNumber})',
+      'scheduled_time': notification.scheduledFor.toIso8601String(),
+      'patient_id': notification.patientId,
+      'is_sent': notification.isCompleted,
+      'created_at': notification.createdAt.toIso8601String(),
     };
 
-    // Save directly in standalone scheduled_notifications collection in Firestore
-    await docRef.set(reminderMap);
+    await _supabase.from('scheduled_notifications').insert(reminderMap);
   }
 
   Future<void> markAsCompleted(String patientId, String reminderId) async {
     try {
-      await _firestore.collection('scheduled_notifications').doc(reminderId).update({
-        'isCompleted': true,
-      });
+      await _supabase.from('scheduled_notifications').update({
+        'is_sent': true,
+      }).eq('id', reminderId);
     } catch (_) {}
   }
 
   Future<void> deleteScheduledNotification(String patientId, String reminderId) async {
     try {
-      await _firestore.collection('scheduled_notifications').doc(reminderId).delete();
+      await _supabase.from('scheduled_notifications').delete().eq('id', reminderId);
     } catch (_) {}
   }
 }

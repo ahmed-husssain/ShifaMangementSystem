@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/errors/app_error.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
@@ -90,14 +90,13 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
   Future<void> _generateInvoiceNumber() async {
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('invoices')
-          .get();
+      final snap = await Supabase.instance.client
+          .from('invoices')
+          .select('invoice_number');
 
       int highest = 4999;
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final existingNum = data['invoiceNumber'] as String? ?? '';
+      for (final doc in snap) {
+        final existingNum = (doc['invoice_number'] ?? doc['invoiceNumber']) as String? ?? '';
         final parsed = int.tryParse(existingNum.replaceAll(RegExp(r'[^0-9]'), ''));
         if (parsed != null && parsed > highest) {
           highest = parsed;
@@ -122,12 +121,13 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   Future<void> _loadPatient() async {
     if (widget.patientId == null || widget.patientId!.isEmpty) return;
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('patients')
-          .doc(widget.patientId)
-          .get();
-      if (doc.exists) {
-        final p = Patient.fromMap(doc.data()!, doc.id);
+      final doc = await Supabase.instance.client
+          .from('patients')
+          .select()
+          .eq('id', widget.patientId!)
+          .maybeSingle();
+      if (doc != null) {
+        final p = Patient.fromMap(doc, (doc['id'] ?? '').toString());
         _populatePatientData(p, defaultDays: widget.defaultDays);
       }
     } catch (e) {
@@ -145,35 +145,39 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     });
 
     try {
-      // 1. Search by exact mrNumber
-      var snap = await FirebaseFirestore.instance
-          .collection('patients')
-          .where('mrNumber', isEqualTo: trimmed)
-          .get();
+      var snap = await Supabase.instance.client
+          .from('patients')
+          .select()
+          .ilike('mr_number', trimmed);
 
-      // 2. Search by uppercase mrNumber
-      if (snap.docs.isEmpty) {
-        snap = await FirebaseFirestore.instance
-            .collection('patients')
-            .where('mrNumber', isEqualTo: trimmed.toUpperCase())
-            .get();
-      }
+      if (snap.isEmpty) {
+        final docSnap = await Supabase.instance.client
+            .from('patients')
+            .select()
+            .eq('id', trimmed)
+            .maybeSingle();
+        if (docSnap != null) {
+          final p = Patient.fromMap(docSnap, (docSnap['id'] ?? '').toString());
+          final user = ref.read(authStateProvider).value;
+          final profile = ref.read(userProfileProvider).value;
+          final role = profile?['role'] ?? 'staff';
 
-      // 3. Search by doc ID
-      if (snap.docs.isEmpty) {
-        final docSnap = await FirebaseFirestore.instance
-            .collection('patients')
-            .doc(trimmed)
-            .get();
-        if (docSnap.exists) {
-          final p = Patient.fromMap(docSnap.data()!, docSnap.id);
+          if (role == 'staff' && user != null && p.assignedStaffId != user.uid && p.createdBy != user.uid) {
+            setState(() {
+              _isSearchingPatient = false;
+              _searchStatusMessage = 'Access Denied: Patient belongs to another staff member.';
+            });
+            return;
+          }
+
           _populatePatientData(p);
           return;
         }
       }
 
-      if (snap.docs.isNotEmpty) {
-        final p = Patient.fromMap(snap.docs.first.data(), snap.docs.first.id);
+      if (snap.isNotEmpty) {
+        final doc = snap.first;
+        final p = Patient.fromMap(doc, (doc['id'] ?? '').toString());
         final user = ref.read(authStateProvider).value;
         final profile = ref.read(userProfileProvider).value;
         final role = profile?['role'] ?? 'staff';
@@ -383,9 +387,9 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
       // Auto-create or update Patient in Firestore
       if (_patient == null) {
-        final pDoc = FirebaseFirestore.instance.collection('patients').doc();
+        final patientId = DateTime.now().millisecondsSinceEpoch.toString();
         final newPatient = Patient(
-          patientId: pDoc.id,
+          patientId: patientId,
           mrNumber: mrNum.isEmpty
               ? 'SHHC-${DateFormat('yyMMdd').format(DateTime.now())}-${(1000 + DateTime.now().millisecond)}'
               : mrNum,
@@ -403,15 +407,17 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           staffPayment: 0,
           profit: 0,
           days: 0,
-          assignedStaffId: user.uid,
+          assignedStaffId: user.id,
           organizationId: 'default',
-          createdBy: user.uid,
+          createdBy: user.id,
           createdAt: DateTime.now(),
-          updatedBy: user.uid,
+          updatedBy: user.id,
           updatedAt: DateTime.now(),
           isDeleted: false,
         );
-        await pDoc.set(newPatient.toMap());
+        final pMap = newPatient.toSupabaseMap();
+        pMap['id'] = patientId;
+        await Supabase.instance.client.from('patients').insert(pMap);
         _patient = newPatient;
       } else {
         // Update patient info if edited
