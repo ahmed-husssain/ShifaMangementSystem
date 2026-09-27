@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../register/presentation/pages/register_page.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/providers/presence_provider.dart';
 import '../../../../core/errors/app_error.dart';
 
 class RecentUserHighlightNotifier extends Notifier<String?> {
@@ -47,7 +48,13 @@ class UsersPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final staffAsync = ref.watch(allUsersProvider);
+    final presenceState = ref.watch(onlinePresenceProvider);
     final highlightUsername = ref.watch(recentUserHighlightProvider);
+    final currentUser = ref.watch(authStateProvider).value;
+    final currentProfile = ref.watch(userProfileProvider).value;
+    final currentUserId = currentUser?.id ?? currentProfile?['uid'] ?? currentProfile?['id'];
+    final currentUserEmail = currentUser?.email ?? currentProfile?['email'];
+    final currentUsername = currentProfile?['username']?.toString().toUpperCase();
 
     if (highlightUsername != null) {
       Future.delayed(const Duration(seconds: 5), () {
@@ -67,15 +74,99 @@ class UsersPage extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Staff Management',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Staff Management',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      staffAsync.maybeWhen(
+                        data: (staffList) {
+                          final onlineCount = staffList.where((s) {
+                            final sId = (s['id'] ?? s['uid'] ?? '').toString();
+                            final sEmail = (s['email'] ?? '').toString();
+                            final uName = (s['username'] ?? '').toString();
+                            return presenceState.isOnline(userId: sId, username: uName, email: sEmail);
+                          }).length;
+                          final offlineCount = staffList.length - onlineCount;
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6.5,
+                                      height: 6.5,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4.5),
+                                    Text(
+                                      '$onlineCount Online',
+                                      style: const TextStyle(
+                                        color: Color(0xFF047857),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF94A3B8),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4.5),
+                                    Text(
+                                      '$offlineCount Offline',
+                                      style: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                        orElse: () => const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
                 ),
                 ElevatedButton.icon(
@@ -109,15 +200,40 @@ class UsersPage extends ConsumerWidget {
                 data: (staffList) {
                   if (staffList.isEmpty) return const Center(child: Text('No staff accounts yet.'));
 
-                  // Sort: active users first, then deactivated
+                  // Sort: currently logged-in admin first, then active users, then deactivated
                   final sorted = [...staffList];
                   sorted.sort((a, b) {
+                    final aId = (a['id'] ?? a['uid'] ?? '').toString();
+                    final bId = (b['id'] ?? b['uid'] ?? '').toString();
+                    final aEmail = (a['email'] ?? '').toString().toLowerCase();
+                    final bEmail = (b['email'] ?? '').toString().toLowerCase();
+                    final aUName = (a['username'] ?? '').toString().toUpperCase();
+                    final bUName = (b['username'] ?? '').toString().toUpperCase();
+
+                    final aIsCurrent = (currentUserId != null && aId.isNotEmpty && aId == currentUserId) ||
+                        (currentUserEmail != null && aEmail.isNotEmpty && aEmail == currentUserEmail.toString().toLowerCase()) ||
+                        (currentUsername != null && aUName.isNotEmpty && aUName == currentUsername);
+
+                    final bIsCurrent = (currentUserId != null && bId.isNotEmpty && bId == currentUserId) ||
+                        (currentUserEmail != null && bEmail.isNotEmpty && bEmail == currentUserEmail.toString().toLowerCase()) ||
+                        (currentUsername != null && bUName.isNotEmpty && bUName == currentUsername);
+
+                    if (aIsCurrent && !bIsCurrent) return -1;
+                    if (!aIsCurrent && bIsCurrent) return 1;
+
                     final aStatus = (a['status'] ?? 'active').toString().toLowerCase();
                     final bStatus = (b['status'] ?? 'active').toString().toLowerCase();
                     final aActive = aStatus == 'active';
                     final bActive = bStatus == 'active';
                     if (aActive && !bActive) return -1;
                     if (!aActive && bActive) return 1;
+
+                    final aOnline = presenceState.isOnline(userId: aId, username: aUName, email: aEmail);
+                    final bOnline = presenceState.isOnline(userId: bId, username: bUName, email: bEmail);
+                    if (aActive && bActive) {
+                      if (aOnline && !bOnline) return -1;
+                      if (!aOnline && bOnline) return 1;
+                    }
                     return 0;
                   });
 
@@ -125,39 +241,99 @@ class UsersPage extends ConsumerWidget {
                     itemCount: sorted.length,
                     itemBuilder: (context, index) {
                       final s = sorted[index];
+                      final sId = (s['id'] ?? s['uid'] ?? '').toString();
+                      final sEmail = (s['email'] ?? '').toString().toLowerCase();
+                      final uName = (s['username'] ?? '').toString().toUpperCase();
+
+                      final isCurrentAdmin = (currentUserId != null && sId.isNotEmpty && sId == currentUserId) ||
+                          (currentUserEmail != null && sEmail.isNotEmpty && sEmail == currentUserEmail.toString().toLowerCase()) ||
+                          (currentUsername != null && uName.isNotEmpty && uName == currentUsername);
+
                       final status = (s['status'] ?? 'active').toString().toLowerCase();
                       final isActive = status == 'active';
                       final isDeactivated = status == 'deactivated' || status == 'disabled' || status == 'inactive';
-                      final uName = (s['username'] ?? '').toString().toUpperCase();
                       final isHighlighted = (highlightUsername != null && uName == highlightUsername);
+                      final isUserOnline = presenceState.isOnline(
+                        userId: sId,
+                        username: uName,
+                        email: sEmail,
+                      );
 
                       return Opacity(
                         opacity: isDeactivated ? 0.6 : 1.0,
                         child: Card(
-                          color: isHighlighted
-                              ? const Color(0xFFE2E8F0)
-                              : isDeactivated
-                                  ? const Color(0xFFFFF8F0)
-                                  : Colors.white,
-                          elevation: isHighlighted ? 3 : 1,
+                          color: isCurrentAdmin
+                              ? const Color(0xFFE2E8F0) // Dark shade for currently logged-in admin card
+                              : isHighlighted
+                                  ? const Color(0xFFFEF3C7) // Soft amber for newly created
+                                  : isDeactivated
+                                      ? const Color(0xFFFFF8F0)
+                                      : Colors.white,
+                          elevation: isCurrentAdmin ? 3 : (isHighlighted ? 3 : 1),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(
-                              color: isHighlighted
-                                  ? const Color(0xFF64748B)
-                                  : isDeactivated
-                                      ? Colors.orange.shade200
-                                      : Colors.grey.shade200,
-                              width: isHighlighted ? 1.5 : 1,
+                              color: isCurrentAdmin
+                                  ? const Color(0xFF004B93) // Shifa dark navy border
+                                  : isHighlighted
+                                      ? const Color(0xFFD97706)
+                                      : isDeactivated
+                                          ? Colors.orange.shade200
+                                          : Colors.grey.shade200,
+                              width: isCurrentAdmin ? 2.0 : (isHighlighted ? 1.5 : 1),
                             ),
                           ),
                           child: Column(
                             children: [
-                              if (isHighlighted)
+                              if (isCurrentAdmin)
                                 Container(
                                   width: double.infinity,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFF64748B),
+                                    color: Color(0xFF004B93),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(10.0),
+                                      topRight: Radius.circular(10.0),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.shield, color: Colors.white, size: 14),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'LOGGED IN ADMIN ACCOUNT (YOU)',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0x33FFFFFF),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'ACTIVE SESSION',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (isHighlighted && !isCurrentAdmin)
+                                Container(
+                                  width: double.infinity,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFD97706),
                                     borderRadius: BorderRadius.only(
                                       topLeft: Radius.circular(10.5),
                                       topRight: Radius.circular(10.5),
@@ -180,7 +356,7 @@ class UsersPage extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
-                              if (isDeactivated && !isHighlighted)
+                              if (isDeactivated && !isHighlighted && !isCurrentAdmin)
                                 Container(
                                   width: double.infinity,
                                   decoration: BoxDecoration(
@@ -208,20 +384,144 @@ class UsersPage extends ConsumerWidget {
                                   ),
                                 ),
                               ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: isActive ? Colors.green.shade100 : Colors.orange.shade100,
-                                  child: Icon(
-                                    isActive ? Icons.person : Icons.person_off,
-                                    color: isActive ? Colors.green : Colors.orange.shade700,
-                                  ),
+                                leading: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: isCurrentAdmin
+                                          ? const Color(0xFF004B93)
+                                          : (isActive ? const Color(0xFFE0F2FE) : Colors.orange.shade100),
+                                      child: Icon(
+                                        isCurrentAdmin
+                                            ? Icons.admin_panel_settings
+                                            : (isActive ? Icons.person : Icons.person_off),
+                                        color: isCurrentAdmin
+                                            ? Colors.white
+                                            : (isActive ? const Color(0xFF004B93) : Colors.orange.shade700),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: isUserOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          ),
+                                          boxShadow: isUserOnline
+                                              ? [
+                                                  BoxShadow(
+                                                    color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                                                    blurRadius: 3,
+                                                    spreadRadius: 1,
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                title: Text(
-                                  s['name'] ?? 'Unknown',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isDeactivated ? Colors.grey.shade600 : null,
-                                    decoration: isDeactivated ? TextDecoration.lineThrough : null,
-                                  ),
+                                title: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        s['name'] ?? 'Unknown',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: isDeactivated ? Colors.grey.shade600 : null,
+                                          decoration: isDeactivated ? TextDecoration.lineThrough : null,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isCurrentAdmin) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF004B93),
+                                          borderRadius: BorderRadius.circular(5),
+                                        ),
+                                        child: const Text(
+                                          'YOU',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(width: 6),
+                                    if (isUserOnline)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFECFDF5),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 5.5,
+                                              height: 5.5,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFF10B981),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 3.5),
+                                            const Text(
+                                              'Online',
+                                              style: TextStyle(
+                                                color: Color(0xFF047857),
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 5,
+                                              height: 5,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFF94A3B8),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 3.5),
+                                            const Text(
+                                              'Offline',
+                                              style: TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 subtitle: Text('Role: ${s['role'] == 'admin' ? 'Admin' : 'User'} • Username: ${s['username']}'),
                                 onTap: () => _showUserDetails(context, s),
@@ -238,10 +538,19 @@ class UsersPage extends ConsumerWidget {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      _DeactivationSwitch(
-                                        isActive: isActive,
-                                        userUid: s['uid'],
-                                      ),
+                                      if (isCurrentAdmin)
+                                        const Tooltip(
+                                          message: 'Active admin session',
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 10.0),
+                                            child: Icon(Icons.verified_user, size: 22, color: Color(0xFF004B93)),
+                                          ),
+                                        )
+                                      else
+                                        _DeactivationSwitch(
+                                          isActive: isActive,
+                                          userUid: s['uid'],
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -503,6 +812,48 @@ class _UserDetailsModalState extends ConsumerState<_UserDetailsModal> {
               ],
             ),
             const SizedBox(height: 12),
+            Builder(
+              builder: (context) {
+                final modalPresence = ref.watch(onlinePresenceProvider);
+                final isModalUserOnline = modalPresence.isOnline(
+                  userId: widget.user['uid'] ?? widget.user['id'],
+                  username: username,
+                  email: email,
+                );
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isModalUserOnline ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isModalUserOnline ? const Color(0xFFA7F3D0) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isModalUserOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isModalUserOnline ? 'Online Now (Active in App)' : 'Offline (App Closed)',
+                        style: TextStyle(
+                          color: isModalUserOnline ? const Color(0xFF047857) : const Color(0xFF64748B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
             Text(
               'Username: $username',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
