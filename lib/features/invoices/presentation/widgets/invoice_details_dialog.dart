@@ -937,15 +937,19 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, top: 4.0),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 17, color: const Color(0xFF1565C0)),
           const SizedBox(width: 6),
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13.5,
-              color: Color(0xFF1565C0),
+          Flexible(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13.5,
+                color: Color(0xFF1565C0),
+              ),
             ),
           ),
         ],
@@ -966,22 +970,30 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+            Expanded(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
                   ),
-                ),
-                if (required)
-                  const Text(' *', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
+                  if (required)
+                    const Text(' *', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-            ?trailing,
+            if (trailing != null) ...[
+              const SizedBox(width: 6),
+              trailing,
+            ],
           ],
         ),
         const SizedBox(height: 5),
@@ -1154,40 +1166,45 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  _buildSectionHeader(
-                    icon: Icons.medical_services_outlined,
-                    title: 'Services & Care Plan',
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: Text(
-                      '${_editableServices.length}/$_maxServices',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1D4ED8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: _buildSectionHeader(
+                        icon: Icons.medical_services_outlined,
+                        title: 'Services & Care Plan',
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Text(
+                        '${_editableServices.length}/$_maxServices',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: _editableServices.length < _maxServices ? _addServiceRow : null,
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                label: const Text('Add Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                label: const Text('Add Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1565C0),
                   disabledBackgroundColor: Colors.grey.shade300,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
