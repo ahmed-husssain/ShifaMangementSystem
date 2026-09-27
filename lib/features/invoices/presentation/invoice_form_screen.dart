@@ -691,7 +691,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: Image.asset(
-                                      'assets/Shifa_Logo-BG.png',
+                                      'assets/ShifaLogo.jpeg',
                                       width: 145,
                                       height: 50,
                                       fit: BoxFit.contain,

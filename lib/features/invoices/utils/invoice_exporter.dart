@@ -40,7 +40,7 @@ class InvoiceExporter {
     // Load assets
     pw.MemoryImage? logoImage;
     try {
-      final logoData = await rootBundle.load('assets/Shifa_Logo-BG.png');
+      final logoData = await rootBundle.load('assets/ShifaLogo.jpeg');
       logoImage = pw.MemoryImage(logoData.buffer.asUint8List());
     } catch (_) {}
 
