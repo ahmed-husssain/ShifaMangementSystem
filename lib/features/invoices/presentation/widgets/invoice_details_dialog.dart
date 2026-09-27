@@ -492,23 +492,26 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final isNarrow = screenWidth < 680;
-    final dialogWidth = screenWidth > 780 ? 760.0 : (screenWidth - 24.0);
+    final dialogWidth = screenWidth > 780 ? 760.0 : (screenWidth - (isNarrow ? 16.0 : 24.0));
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 8 : 16,
+        vertical: isNarrow ? 12 : 24,
+      ),
       clipBehavior: Clip.antiAlias,
       backgroundColor: Colors.white,
       child: Container(
         width: dialogWidth,
         constraints: BoxConstraints(
-          maxHeight: screenHeight * 0.92,
+          maxHeight: screenHeight * 0.94,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Fixed Top Header
-            _buildHeader(role),
+            _buildHeader(role, isNarrow),
 
             // Scrollable Content Body with Scrollbar
             Flexible(
@@ -518,8 +521,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 child: SingleChildScrollView(
                   controller: _scrollController,
                   padding: EdgeInsets.symmetric(
-                    horizontal: isNarrow ? 14 : 20,
-                    vertical: 14,
+                    horizontal: isNarrow ? 10 : 20,
+                    vertical: isNarrow ? 10 : 14,
                   ),
                   child: _isEditing ? _buildEditForm(isNarrow) : _buildDetailsView(),
                 ),
@@ -527,7 +530,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             ),
 
             // Fixed Bottom Action Bar
-            _buildFooter(),
+            _buildFooter(isNarrow),
           ],
         ),
       ),
@@ -752,12 +755,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     );
   }
 
-  Widget _buildHeader(String role) {
+  Widget _buildHeader(String role, bool isNarrow) {
     final isPaid = widget.invoice.paymentStatus.trim().toLowerCase() == 'paid';
     final isPartial = widget.invoice.paymentStatus.trim().toLowerCase() == 'partial';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 12 : 18,
+        vertical: isNarrow ? 10 : 14,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -773,26 +779,26 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             child: Icon(
               _isEditing ? Icons.edit_document : Icons.receipt_long_rounded,
               color: const Color(0xFF1565C0),
-              size: 20,
+              size: isNarrow ? 18 : 20,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
+              spacing: 6,
               runSpacing: 4,
               children: [
                 Text(
-                  _isEditing ? 'Edit Invoice Details' : 'Invoice Details',
-                  style: const TextStyle(
-                    fontSize: 16,
+                  _isEditing ? 'Edit Invoice' : 'Invoice Details',
+                  style: TextStyle(
+                    fontSize: isNarrow ? 15 : 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: const Color(0xFF0F172A),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(6),
@@ -800,15 +806,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                   ),
                   child: Text(
                     widget.invoice.invoiceNumber,
-                    style: const TextStyle(
-                      fontSize: 11.5,
+                    style: TextStyle(
+                      fontSize: isNarrow ? 10.5 : 11.5,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF334155),
+                      color: const Color(0xFF334155),
                     ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: isPaid
                         ? const Color(0xFFDCFCE7)
@@ -818,7 +824,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                   child: Text(
                     widget.invoice.paymentStatus.toUpperCase(),
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: isNarrow ? 10 : 10.5,
                       fontWeight: FontWeight.bold,
                       color: isPaid
                           ? const Color(0xFF15803D)
@@ -834,22 +840,29 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
               tooltip: 'Delete Invoice',
               onPressed: _deleteInvoice,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             ),
           IconButton(
             icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
             tooltip: 'Close',
             onPressed: () => Navigator.of(context).pop(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(bool isNarrow) {
     final formatter = NumberFormat('#,###');
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 12 : 18,
+        vertical: isNarrow ? 10 : 12,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
@@ -859,11 +872,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
           if (_isEditing)
             Expanded(
               child: Text(
-                '${_editableServices.length} ${_editableServices.length == 1 ? 'Service' : 'Services'}  •  Total: Rs. ${formatter.format(_grandTotal.toInt())}',
-                style: const TextStyle(
-                  fontSize: 12,
+                isNarrow
+                    ? '${_editableServices.length} ${_editableServices.length == 1 ? 'Svc' : 'Svcs'} • Rs. ${formatter.format(_grandTotal.toInt())}'
+                    : '${_editableServices.length} ${_editableServices.length == 1 ? 'Service' : 'Services'}  •  Total: Rs. ${formatter.format(_grandTotal.toInt())}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: isNarrow ? 11.5 : 12,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF475569),
+                  color: const Color(0xFF475569),
                 ),
               ),
             )
@@ -885,21 +902,44 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 setState(() => _isEditing = false);
               },
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 12 : 16,
+                  vertical: isNarrow ? 8 : 10,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: const BorderSide(color: Color(0xFFCBD5E1)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: const Color(0xFF475569),
+                  fontWeight: FontWeight.bold,
+                  fontSize: isNarrow ? 12 : 13,
+                ),
+              ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: isNarrow ? 6 : 10),
             ElevatedButton.icon(
               onPressed: _saveChanges,
-              icon: const Icon(Icons.check_rounded, size: 16),
-              label: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+              icon: Icon(Icons.check_rounded, size: isNarrow ? 15 : 16),
+              label: Text(
+                isNarrow ? 'Save' : 'Save Changes',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isNarrow ? 12 : 13,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1565C0),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 12 : 18,
+                  vertical: isNarrow ? 8 : 10,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
@@ -908,21 +948,43 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             OutlinedButton(
               onPressed: () => Navigator.of(context).pop(),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 12 : 16,
+                  vertical: isNarrow ? 8 : 10,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: const BorderSide(color: Color(0xFFCBD5E1)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Close', style: TextStyle(color: Color(0xFF475569))),
+              child: Text(
+                'Close',
+                style: TextStyle(
+                  color: const Color(0xFF475569),
+                  fontSize: isNarrow ? 12 : 13,
+                ),
+              ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: isNarrow ? 6 : 10),
             ElevatedButton.icon(
               onPressed: () => setState(() => _isEditing = true),
-              icon: const Icon(Icons.edit_rounded, size: 16),
-              label: const Text('Edit Invoice', style: TextStyle(fontWeight: FontWeight.bold)),
+              icon: Icon(Icons.edit_rounded, size: isNarrow ? 15 : 16),
+              label: Text(
+                isNarrow ? 'Edit' : 'Edit Invoice',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isNarrow ? 12 : 13,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1565C0),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 12 : 18,
+                  vertical: isNarrow ? 8 : 10,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
@@ -969,25 +1031,31 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF334155),
-                      ),
-                    ),
+              child: Text.rich(
+                TextSpan(
+                  text: label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF334155),
                   ),
-                  if (required)
-                    const Text(' *', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
-                ],
+                  children: [
+                    if (required)
+                      const TextSpan(
+                        text: ' *',
+                        style: TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
             if (trailing != null) ...[
@@ -1007,15 +1075,23 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     String? prefixText,
     Widget? suffixIcon,
     bool readOnly = false,
+    bool isNarrow = false,
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: isNarrow ? 12 : 13),
       prefixText: prefixText,
-      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+      prefixStyle: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: isNarrow ? 12 : 13,
+        color: const Color(0xFF1E293B),
+      ),
       suffixIcon: suffixIcon,
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 9 : 12,
+        vertical: isNarrow ? 9 : 11,
+      ),
       filled: true,
       fillColor: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
       border: OutlineInputBorder(
@@ -1055,7 +1131,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             title: 'Patient Information',
           ),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(isNarrow ? 11 : 14),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
@@ -1113,7 +1189,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                     required: true,
                     child: TextFormField(
                       controller: _patientNameController,
-                      decoration: _buildInputDecoration(hintText: 'Enter patient full name'),
+                      decoration: _buildInputDecoration(hintText: 'Enter patient full name', isNarrow: isNarrow),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                     ),
                   ),
@@ -1122,24 +1198,26 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
+                        flex: 3,
                         child: _buildField(
                           label: 'Phone Number',
                           required: true,
                           child: TextFormField(
                             controller: _patientPhoneController,
-                            decoration: _buildInputDecoration(hintText: '03001234567'),
+                            decoration: _buildInputDecoration(hintText: '03001234567', isNarrow: isNarrow),
                             validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
+                        flex: 2,
                         child: _buildField(
-                          label: 'Invoice Number',
+                          label: 'Invoice #',
                           child: TextFormField(
                             controller: _invoiceNumberController,
                             readOnly: true,
-                            decoration: _buildInputDecoration(readOnly: true),
+                            decoration: _buildInputDecoration(readOnly: true, isNarrow: isNarrow),
                           ),
                         ),
                       ),
@@ -1153,26 +1231,33 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                   child: TextFormField(
                     controller: _patientAddressController,
                     maxLines: 2,
-                    decoration: _buildInputDecoration(hintText: 'Enter complete home address'),
+                    decoration: _buildInputDecoration(hintText: 'Enter complete home address', isNarrow: isNarrow),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           // ─── Section 2: Services & Care Plan ───
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Row(
                   children: [
+                    const Icon(Icons.medical_services_outlined, size: 17, color: Color(0xFF1565C0)),
+                    const SizedBox(width: 6),
                     Flexible(
-                      child: _buildSectionHeader(
-                        icon: Icons.medical_services_outlined,
-                        title: 'Services & Care Plan',
+                      child: Text(
+                        isNarrow ? 'Services' : 'Services & Care Plan',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: Color(0xFF1565C0),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1186,7 +1271,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                       child: Text(
                         '${_editableServices.length}/$_maxServices',
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1D4ED8),
                         ),
@@ -1198,13 +1283,21 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: _editableServices.length < _maxServices ? _addServiceRow : null,
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
-                label: const Text('Add Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
+                label: Text(
+                  isNarrow ? 'Add' : 'Add Service',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1565C0),
                   disabledBackgroundColor: Colors.grey.shade300,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isNarrow ? 8 : 12,
+                    vertical: isNarrow ? 6 : 8,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
@@ -1322,14 +1415,14 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 // Right column: Financial Totals Card
                 Expanded(
                   flex: 5,
-                  child: _buildFinancialSummaryCard(formatter),
+                  child: _buildFinancialSummaryCard(formatter, isNarrow: isNarrow),
                 ),
               ],
             ),
           ] else ...[
             // Narrow mobile layout: Stacked Payment & Totals
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(11),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
@@ -1339,7 +1432,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 label: 'Payment Status',
                 child: DropdownButtonFormField<String>(
                   initialValue: _paymentStatus,
-                  decoration: _buildInputDecoration(),
+                  decoration: _buildInputDecoration(isNarrow: isNarrow),
                   items: const [
                     DropdownMenuItem(
                       value: 'Paid',
@@ -1361,7 +1454,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            _buildFinancialSummaryCard(formatter),
+            _buildFinancialSummaryCard(formatter, isNarrow: isNarrow),
           ],
         ],
       ),
@@ -1391,7 +1484,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isNarrow ? 10 : 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1402,7 +1495,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(6),
@@ -1411,23 +1504,23 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                     child: Text(
                       'Service #${index + 1}',
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1D4ED8),
                       ),
                     ),
                   ),
                   if (item.isNewlyAdded) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
                         'NEW',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
                       ),
                     ),
                   ],
@@ -1442,12 +1535,12 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red.shade700),
+                        Icon(Icons.delete_outline_rounded, size: 15, color: Colors.red.shade700),
                         const SizedBox(width: 3),
                         Text(
                           'Remove',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.red.shade700,
                           ),
@@ -1458,8 +1551,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 )
               else
                 Text(
-                  'Primary Service (Required)',
-                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey.shade500),
+                  isNarrow ? 'Primary (Req)' : 'Primary Service (Required)',
+                  style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Colors.grey.shade500),
                 ),
             ],
           ),
@@ -1467,7 +1560,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
 
           // Service Name field with Quick Select Standard dropdown
           _buildField(
-            label: 'Service Name / Care Description',
+            label: isNarrow ? 'Service Name' : 'Service Name / Care Description',
             required: true,
             trailing: PopupMenuButton<String>(
               tooltip: 'Choose standard service',
@@ -1485,20 +1578,27 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 );
               }).toList(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 6 : 8,
+                  vertical: 3,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: const Color(0xFFCBD5E1)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.list_alt_rounded, size: 13, color: Color(0xFF1565C0)),
-                    SizedBox(width: 4),
+                    const Icon(Icons.list_alt_rounded, size: 13, color: Color(0xFF1565C0)),
+                    const SizedBox(width: 3),
                     Text(
-                      'Standard List ▾',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1565C0)),
+                      isNarrow ? 'Standard ▾' : 'Standard List ▾',
+                      style: TextStyle(
+                        fontSize: isNarrow ? 10.5 : 11,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1565C0),
+                      ),
                     ),
                   ],
                 ),
@@ -1508,6 +1608,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               controller: item.nameController,
               decoration: _buildInputDecoration(
                 hintText: 'e.g. Home Nursing Care Services',
+                isNarrow: isNarrow,
               ),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Service name is required' : null,
             ),
@@ -1601,8 +1702,9 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
+                  flex: 3,
                   child: _buildField(
-                    label: 'Rate / Day (PKR)',
+                    label: 'Rate / Day',
                     required: true,
                     child: TextFormField(
                       controller: item.priceController,
@@ -1611,6 +1713,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                       decoration: _buildInputDecoration(
                         hintText: '0',
                         prefixText: 'Rs. ',
+                        isNarrow: isNarrow,
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -1622,6 +1725,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
+                  flex: 2,
                   child: _buildField(
                     label: 'Days / Qty',
                     required: true,
@@ -1631,6 +1735,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: _buildInputDecoration(
                         hintText: '1',
+                        isNarrow: isNarrow,
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -1645,7 +1750,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(8),
@@ -1656,12 +1761,12 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                 children: [
                   const Text(
                     'Line Total:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E40AF)),
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E40AF)),
                   ),
                   Text(
                     'Rs. ${formatter.format(item.total.toInt())}',
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E40AF),
                     ),
@@ -1675,9 +1780,9 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     );
   }
 
-  Widget _buildFinancialSummaryCard(NumberFormat formatter) {
+  Widget _buildFinancialSummaryCard(NumberFormat formatter, {bool isNarrow = false}) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isNarrow ? 12 : 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -1689,19 +1794,27 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Calculated Subtotal:',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                style: TextStyle(
+                  fontSize: isNarrow ? 11.5 : 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF64748B),
+                ),
               ),
               Text(
                 'Rs. ${formatter.format(_subtotal.toInt())}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                style: TextStyle(
+                  fontSize: isNarrow ? 13 : 14,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
           _buildField(
-            label: 'Discount Amount (PKR)',
+            label: isNarrow ? 'Discount (PKR)' : 'Discount Amount (PKR)',
             child: TextFormField(
               controller: _discountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1709,6 +1822,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
               decoration: _buildInputDecoration(
                 hintText: '0',
                 prefixText: 'Rs. ',
+                isNarrow: isNarrow,
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Required';
@@ -1722,7 +1836,10 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
           const SizedBox(height: 12),
           // Grand Total Banner
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            padding: EdgeInsets.symmetric(
+              horizontal: isNarrow ? 10 : 14,
+              vertical: isNarrow ? 9 : 11,
+            ),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
@@ -1741,21 +1858,21 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'NEW GRAND TOTAL',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12.5,
+                    fontSize: isNarrow ? 11 : 12.5,
                     letterSpacing: 0.5,
                   ),
                 ),
                 Text(
                   'Rs. ${formatter.format(_grandTotal.toInt())}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: isNarrow ? 14.5 : 16,
                   ),
                 ),
               ],
