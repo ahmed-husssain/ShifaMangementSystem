@@ -491,6 +491,9 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       );
 
       final newDocId = await repo.createInvoice(invoice, userName: userName);
+      ref.invalidate(allInvoicesProvider(false));
+      ref.invalidate(allInvoicesProvider(true));
+      ref.invalidate(staffInvoicesProvider);
 
       if (mounted) {
         // Highlight the newly created invoice on the Invoices page

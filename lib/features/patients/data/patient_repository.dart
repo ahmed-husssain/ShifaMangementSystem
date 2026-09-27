@@ -28,12 +28,11 @@ class PatientRepository {
     return _supabase
         .from('patients')
         .stream(primaryKey: ['id'])
-        .eq('is_deleted', false)
         .order('created_at', ascending: false)
         .map((rows) {
           final list = rows
               .map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString()))
-              .where((p) => p.createdBy == staffId || p.assignedStaffId == staffId)
+              .where((p) => !p.isDeleted && (p.createdBy == staffId || p.assignedStaffId == staffId))
               .toList();
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
@@ -41,15 +40,18 @@ class PatientRepository {
   }
 
   Stream<List<Patient>> watchAllPatients({bool includeDeleted = false}) {
-    var stream = _supabase.from('patients').stream(primaryKey: ['id']);
-    if (!includeDeleted) {
-      stream = stream.eq('is_deleted', false);
-    }
-    return stream.order('created_at', ascending: false).map((rows) {
-      final list = rows.map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString())).toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    });
+    return _supabase
+        .from('patients')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((rows) {
+          final list = rows
+              .map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString()))
+              .where((p) => includeDeleted ? true : !p.isDeleted)
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   Future<void> createPatient(Patient patient, {String? userName}) async {
@@ -93,12 +95,14 @@ class PatientRepository {
 
     await _supabase.from('patients').update({
       'is_deleted': true,
+      'is_discontinued': false,
       'deleted_at': now,
       'deleted_by': userId,
     }).eq('id', patientId);
 
     await _supabase.from('invoices').update({
       'is_deleted': true,
+      'is_discontinued': false,
       'deleted_at': now,
       'deleted_by': userId,
     }).eq('patient_id', patientId);
@@ -127,6 +131,7 @@ class PatientRepository {
 
     await _supabase.from('patients').update({
       'is_deleted': false,
+      'is_discontinued': false,
       'deleted_at': null,
       'deleted_by': null,
       'updated_at': now,
@@ -135,6 +140,7 @@ class PatientRepository {
 
     await _supabase.from('invoices').update({
       'is_deleted': false,
+      'is_discontinued': false,
       'deleted_at': null,
       'deleted_by': null,
       'updated_at': now,
@@ -165,12 +171,14 @@ class PatientRepository {
 
     await _supabase.from('patients').update({
       'is_discontinued': true,
+      'is_deleted': false,
       'discontinued_at': now,
       'discontinued_by': userId,
     }).eq('id', patientId);
 
     await _supabase.from('invoices').update({
       'is_discontinued': true,
+      'is_deleted': false,
     }).eq('patient_id', patientId);
 
     await _supabase.from('activities').insert({
@@ -197,6 +205,7 @@ class PatientRepository {
 
     await _supabase.from('patients').update({
       'is_discontinued': false,
+      'is_deleted': false,
       'discontinued_at': null,
       'discontinued_by': null,
       'reactivated_at': now,
@@ -205,6 +214,7 @@ class PatientRepository {
 
     await _supabase.from('invoices').update({
       'is_discontinued': false,
+      'is_deleted': false,
     }).eq('patient_id', patientId);
 
     await _supabase.from('activities').insert({

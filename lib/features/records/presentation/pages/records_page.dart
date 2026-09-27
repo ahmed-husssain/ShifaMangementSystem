@@ -8,6 +8,7 @@ import '../../../patients/presentation/patient_form_screen.dart';
 import '../../../patients/domain/patient_model.dart';
 import '../../../invoices/presentation/invoice_form_screen.dart';
 import '../../../invoices/presentation/pages/invoices_page.dart';
+import '../../../invoices/data/invoice_repository.dart';
 import '../../../dashboard/presentation/widgets/schedule_notification_modal.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -603,6 +604,12 @@ class _RecordsPageState extends ConsumerState<RecordsPage> {
               userId: user?.uid ?? 'Admin',
               organizationId: patient.organizationId,
             );
+        ref.invalidate(allPatientsProvider(false));
+        ref.invalidate(allPatientsProvider(true));
+        ref.invalidate(staffPatientsProvider);
+        ref.invalidate(allInvoicesProvider(false));
+        ref.invalidate(allInvoicesProvider(true));
+        ref.invalidate(staffInvoicesProvider);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -761,6 +768,12 @@ class _PatientDetailsModal extends ConsumerWidget {
                                   userId: user?.uid ?? 'Admin',
                                   organizationId: patient.organizationId,
                                 );
+                            ref.invalidate(allPatientsProvider(false));
+                            ref.invalidate(allPatientsProvider(true));
+                            ref.invalidate(staffPatientsProvider);
+                            ref.invalidate(allInvoicesProvider(false));
+                            ref.invalidate(allInvoicesProvider(true));
+                            ref.invalidate(staffInvoicesProvider);
                             if (context.mounted) {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -860,7 +873,22 @@ class _PatientDetailsModal extends ConsumerWidget {
                                   userId: user!.uid,
                                   organizationId: patient.organizationId,
                                 );
-                            if (context.mounted) Navigator.pop(context);
+                            ref.invalidate(allPatientsProvider(false));
+                            ref.invalidate(allPatientsProvider(true));
+                            ref.invalidate(staffPatientsProvider);
+                            ref.invalidate(allInvoicesProvider(false));
+                            ref.invalidate(allInvoicesProvider(true));
+                            ref.invalidate(staffInvoicesProvider);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✓ Patient "${patient.patientName}" reactivated successfully'),
+                                  backgroundColor: Colors.green.shade700,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
                           }
                         },
                       )
@@ -900,7 +928,22 @@ class _PatientDetailsModal extends ConsumerWidget {
                                   userId: user!.uid,
                                   organizationId: patient.organizationId,
                                 );
-                            if (context.mounted) Navigator.pop(context);
+                            ref.invalidate(allPatientsProvider(false));
+                            ref.invalidate(allPatientsProvider(true));
+                            ref.invalidate(staffPatientsProvider);
+                            ref.invalidate(allInvoicesProvider(false));
+                            ref.invalidate(allInvoicesProvider(true));
+                            ref.invalidate(staffInvoicesProvider);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✓ Patient "${patient.patientName}" marked as discontinued'),
+                                  backgroundColor: Colors.orange.shade800,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
                           }
                         },
                       ),
@@ -954,7 +997,22 @@ class _PatientDetailsModal extends ConsumerWidget {
                                   userId: user!.uid,
                                   organizationId: patient.organizationId,
                                 );
-                            if (context.mounted) Navigator.pop(context);
+                            ref.invalidate(allPatientsProvider(false));
+                            ref.invalidate(allPatientsProvider(true));
+                            ref.invalidate(staffPatientsProvider);
+                            ref.invalidate(allInvoicesProvider(false));
+                            ref.invalidate(allInvoicesProvider(true));
+                            ref.invalidate(staffInvoicesProvider);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✓ Patient "${patient.patientName}" deleted and moved to archive'),
+                                  backgroundColor: Colors.red.shade700,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
                           }
                         },
                       ),
