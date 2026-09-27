@@ -64,9 +64,32 @@ class MainLayout extends ConsumerWidget {
         elevation: 1,
         foregroundColor: Colors.black87,
         title: Image.asset(
-          'assets/Shifa_Logo-BG.png',
+          'assets/ShifaLogo.jpeg',
           height: 52,
           fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0056B3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Shifa',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0056B3),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           _PulsingNotificationBell(

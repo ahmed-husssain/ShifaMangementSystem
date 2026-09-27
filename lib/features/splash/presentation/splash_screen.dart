@@ -68,10 +68,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16),
                       child: Image.asset(
-                        'assets/Shifa_Logo-BG.png',
+                        'assets/ShifaLogo.jpeg',
                         width: 150,
                         height: 150,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 150,
+                          height: 150,
+                          color: const Color(0xFF0056B3),
+                          child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 70),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
