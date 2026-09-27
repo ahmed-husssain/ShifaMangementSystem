@@ -258,6 +258,10 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
         await repo.createPatient(finalPatient, userName: userName);
       }
 
+      ref.invalidate(allPatientsProvider(false));
+      ref.invalidate(allPatientsProvider(true));
+      ref.invalidate(staffPatientsProvider);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

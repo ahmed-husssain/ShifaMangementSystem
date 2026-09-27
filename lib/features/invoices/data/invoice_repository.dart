@@ -19,14 +19,13 @@ class InvoiceRepository {
     return _supabase
         .from('invoices')
         .stream(primaryKey: ['id'])
-        .eq('is_deleted', false)
         .order('created_at', ascending: false)
         .limit(limit)
         .map((rows) {
           final list = rows
               .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
               .where((inv) {
-                if (inv.isDiscontinued) return false;
+                if (inv.isDeleted || inv.isDiscontinued) return false;
                 final isForStaffPatient = staffPatientIds != null && staffPatientIds.contains(inv.patientId);
                 final isCreatedByStaff = inv.createdBy == staffId || inv.staffId == staffId;
                 return isForStaffPatient || isCreatedByStaff;
@@ -38,17 +37,19 @@ class InvoiceRepository {
   }
 
   Stream<List<Invoice>> watchAllInvoices({bool includeDeleted = false, int limit = 500}) {
-    var stream = _supabase.from('invoices').stream(primaryKey: ['id']);
-    if (!includeDeleted) {
-      stream = stream.eq('is_deleted', false);
-    }
-    return stream
+    return _supabase
+        .from('invoices')
+        .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .limit(limit)
         .map((rows) {
           final list = rows
               .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
-              .where((inv) => !inv.isDiscontinued)
+              .where((inv) {
+                if (inv.isDiscontinued) return false;
+                if (!includeDeleted && inv.isDeleted) return false;
+                return true;
+              })
               .toList();
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
