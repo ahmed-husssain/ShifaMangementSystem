@@ -50,10 +50,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Check if the account has been deactivated
       final status = (profile['status'] ?? 'active').toString().toLowerCase();
       if (status == 'deactivated' || status == 'disabled' || status == 'inactive') {
-        ref.read(loginErrorMessageProvider.notifier).setMessage(
-          'Your account has been deactivated. Please contact an administrator.',
-        );
-        ref.read(authControllerProvider).logout();
+        // Defer provider modification out of the synchronous widget build lifecycle
+        Future.microtask(() {
+          ref.read(loginErrorMessageProvider.notifier).setMessage(
+            'Your account has been deactivated. Please contact an administrator.',
+          );
+          ref.read(authControllerProvider).logout();
+        });
         return '/login';
       }
 

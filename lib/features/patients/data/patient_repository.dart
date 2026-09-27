@@ -233,35 +233,97 @@ class PatientRepository {
   /// Read-only preview of next MR Number (does NOT increment database counter)
   Future<String> previewNextMRNumber() async {
     try {
-      final doc = await _supabase.from('system_metrics').select('data').eq('id', 'mr_counter').maybeSingle();
-      int current = 4000;
-      if (doc != null && doc['data'] != null && doc['data'] is Map) {
-        current = (doc['data']['current'] as num?)?.toInt() ?? 4000;
+      int maxNumber = 4000;
+
+      // 1. Fetch latest patients from database to determine the highest existing MR Number
+      final patientsRes = await _supabase
+          .from('patients')
+          .select('mr_number')
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      for (final item in patientsRes) {
+        final mr = item['mr_number']?.toString() ?? '';
+        final match = RegExp(r'-(\d+)$').firstMatch(mr);
+        if (match != null) {
+          final val = int.tryParse(match.group(1)!);
+          if (val != null && val > maxNumber) {
+            maxNumber = val;
+          }
+        }
       }
-      final nextCount = current + 1;
+
+      // 2. Also check system_metrics counter as a cross-reference
+      try {
+        final metricDoc = await _supabase
+            .from('system_metrics')
+            .select('total_patients')
+            .eq('organization_id', 'mr_counter')
+            .maybeSingle();
+        if (metricDoc != null && metricDoc['total_patients'] != null) {
+          final countVal = (metricDoc['total_patients'] as num).toInt();
+          if (countVal > maxNumber) {
+            maxNumber = countVal;
+          }
+        }
+      } catch (_) {}
+
+      final nextCount = maxNumber + 1;
       final now = DateTime.now();
       final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
       return 'SHHC-$dateStr-$nextCount';
     } catch (_) {
       final now = DateTime.now();
       final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-      return 'SHHC-$dateStr-4001';
+      return 'SHHC-$dateStr-4031';
     }
   }
 
   /// Atomically / sequentially gets the next MR Number and increments counter
   Future<String> getNextMRNumber() async {
-    int nextCount = 4001;
+    int nextCount = 4031;
     try {
-      final doc = await _supabase.from('system_metrics').select('data').eq('id', 'mr_counter').maybeSingle();
-      int current = 4000;
-      if (doc != null && doc['data'] != null && doc['data'] is Map) {
-        current = (doc['data']['current'] as num?)?.toInt() ?? 4000;
+      int maxNumber = 4000;
+
+      // 1. Fetch latest patients to guarantee exact sequence from actual records
+      final patientsRes = await _supabase
+          .from('patients')
+          .select('mr_number')
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      for (final item in patientsRes) {
+        final mr = item['mr_number']?.toString() ?? '';
+        final match = RegExp(r'-(\d+)$').firstMatch(mr);
+        if (match != null) {
+          final val = int.tryParse(match.group(1)!);
+          if (val != null && val > maxNumber) {
+            maxNumber = val;
+          }
+        }
       }
-      nextCount = current + 1;
+
+      // 2. Also check system_metrics counter
+      try {
+        final metricDoc = await _supabase
+            .from('system_metrics')
+            .select('total_patients')
+            .eq('organization_id', 'mr_counter')
+            .maybeSingle();
+        if (metricDoc != null && metricDoc['total_patients'] != null) {
+          final countVal = (metricDoc['total_patients'] as num).toInt();
+          if (countVal > maxNumber) {
+            maxNumber = countVal;
+          }
+        }
+      } catch (_) {}
+
+      nextCount = maxNumber + 1;
+
+      // 3. Keep system_metrics in sync
       await _supabase.from('system_metrics').upsert({
-        'id': 'mr_counter',
-        'data': {'current': nextCount},
+        'organization_id': 'mr_counter',
+        'total_patients': nextCount,
         'updated_at': DateTime.now().toIso8601String(),
       });
     } catch (_) {}
@@ -270,6 +332,7 @@ class PatientRepository {
     final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     return 'SHHC-$dateStr-$nextCount';
   }
+
 
   Future<void> syncSystemMetrics({String organizationId = 'default'}) async {
     try {

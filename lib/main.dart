@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
 import 'core/router/app_router.dart';
+import 'shared/providers/presence_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,11 @@ class ShifaApp extends ConsumerWidget {
         useMaterial3: true,
       ),
       routerConfig: router,
+      builder: (context, child) {
+        return AppLifecyclePresenceWatcher(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
