@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/patient_model.dart';
 import '../../../shared/providers/auth_provider.dart';
+import '../../invoices/data/invoice_repository.dart';
+import '../../invoices/domain/invoice_model.dart';
+import '../../users/presentation/pages/users_page.dart';
 
 final patientRepositoryProvider = Provider<PatientRepository>((ref) {
   return PatientRepository(
@@ -9,14 +12,257 @@ final patientRepositoryProvider = Provider<PatientRepository>((ref) {
   );
 });
 
-final allPatientsProvider = StreamProvider.autoDispose.family<List<Patient>, bool>((ref, includeDeleted) {
+/// Map of patient entity_id (or MR number) -> creator user_name from activities log
+final patientCreatorsMapProvider = StreamProvider<Map<String, String>>((ref) {
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase
+      .from('activities')
+      .stream(primaryKey: ['id'])
+      .order('timestamp', ascending: false)
+      .limit(500)
+      .map((rows) {
+        final map = <String, String>{};
+        for (final row in rows) {
+          final entityId = (row['entity_id'] ?? row['entityId'] ?? '').toString().trim();
+          final userName = (row['user_name'] ?? row['userName'] ?? '').toString().trim();
+          final action = (row['action'] ?? '').toString().toUpperCase();
+          if (entityId.isNotEmpty && userName.isNotEmpty && !isGenericStaffIdentifier(userName)) {
+            if (action == 'PATIENT_CREATED' || action.contains('REGISTER') || action.contains('CREATE')) {
+              map[entityId] = userName;
+            } else if (!map.containsKey(entityId)) {
+              map[entityId] = userName;
+            }
+          }
+        }
+        return map;
+      });
+});
+
+/// Map of legacy user_id (e.g. Firebase UIDs) -> user_name from activities log
+final legacyUidToNameProvider = StreamProvider<Map<String, String>>((ref) {
+  final supabase = ref.watch(supabaseClientProvider);
+  return supabase
+      .from('activities')
+      .stream(primaryKey: ['id'])
+      .order('timestamp', ascending: false)
+      .limit(500)
+      .map((rows) {
+        final map = <String, String>{};
+        for (final row in rows) {
+          final userId = (row['user_id'] ?? row['userId'] ?? '').toString().trim().toLowerCase();
+          final userName = (row['user_name'] ?? row['userName'] ?? '').toString().trim();
+          if (userId.isNotEmpty && userName.isNotEmpty && !isGenericStaffIdentifier(userName)) {
+            map[userId] = userName;
+          }
+        }
+        return map;
+      });
+});
+
+bool _patientHasOtherRegisteredCreator(
+  Patient p,
+  Set<String> currentStaffIds,
+  Map<String, String>? legacyUidToName,
+  Map<String, String>? activitiesCreators,
+  List<Map<String, dynamic>>? allUsers,
+) {
+  // If activities recorded a creator who is NOT the current staff member
+  if (activitiesCreators != null) {
+    final actCreator = activitiesCreators[p.patientId] ?? (p.mrNumber.isNotEmpty ? activitiesCreators[p.mrNumber] : null);
+    if (actCreator != null && !isGenericStaffIdentifier(actCreator) && !matchesStaffIdentifier(actCreator, currentStaffIds)) {
+      return true;
+    }
+  }
+
+  // If createdBy is set and belongs to someone else
+  final created = p.createdBy.trim();
+  if (created.isNotEmpty && !isGenericStaffIdentifier(created) && !matchesStaffIdentifier(created, currentStaffIds)) {
+    // If it maps via legacyUid to someone else
+    if (legacyUidToName != null) {
+      final name = legacyUidToName[created.toLowerCase()];
+      if (name != null && !isGenericStaffIdentifier(name) && !matchesStaffIdentifier(name, currentStaffIds)) {
+        return true;
+      }
+    }
+    // If it is in allUsers as someone else
+    if (allUsers != null) {
+      for (final u in allUsers) {
+        final uId = (u['id'] ?? u['uid'] ?? '').toString().toLowerCase();
+        if (created.toLowerCase() == uId) {
+          final uName = (u['name'] ?? u['username'] ?? '').toString();
+          if (!isGenericStaffIdentifier(uName) && !matchesStaffIdentifier(uName, currentStaffIds)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+bool matchesStaffPatient(
+  Patient p,
+  Set<String> staffIdentifiers, {
+  List<Invoice>? allInvoices,
+  List<Map<String, dynamic>>? allUsers,
+  Map<String, String>? activitiesCreators,
+  Map<String, String>? legacyUidToName,
+}) {
+  if (staffIdentifiers.isEmpty) return false;
+
+  // 1. Direct match on createdBy or assignedStaffId
+  if (p.createdBy.isNotEmpty && matchesStaffIdentifier(p.createdBy, staffIdentifiers)) {
+    return true;
+  }
+  if (p.assignedStaffId.isNotEmpty && matchesStaffIdentifier(p.assignedStaffId, staffIdentifiers)) {
+    return true;
+  }
+
+  // 2. Legacy UID mapping (e.g. from activities: 1eXuD0DbdFOKQiZEi5PL7kUCKaN2 -> daniyal)
+  if (legacyUidToName != null && p.createdBy.isNotEmpty) {
+    final mappedName = legacyUidToName[p.createdBy.trim().toLowerCase()];
+    if (mappedName != null && matchesStaffIdentifier(mappedName, staffIdentifiers)) {
+      return true;
+    }
+  }
+  if (legacyUidToName != null && p.assignedStaffId.isNotEmpty) {
+    final mappedName = legacyUidToName[p.assignedStaffId.trim().toLowerCase()];
+    if (mappedName != null && matchesStaffIdentifier(mappedName, staffIdentifiers)) {
+      return true;
+    }
+  }
+
+  // 3. Match from activities audit log (the exact source the admin panel displays)
+  if (activitiesCreators != null) {
+    final actCreator1 = activitiesCreators[p.patientId];
+    if (actCreator1 != null && matchesStaffIdentifier(actCreator1, staffIdentifiers)) {
+      return true;
+    }
+    if (p.mrNumber.isNotEmpty) {
+      final actCreator2 = activitiesCreators[p.mrNumber];
+      if (actCreator2 != null && matchesStaffIdentifier(actCreator2, staffIdentifiers)) {
+        return true;
+      }
+    }
+  }
+
+  // 4. Lookup p.createdBy or p.assignedStaffId in allUsers (maps UUID to username/name)
+  if (allUsers != null) {
+    for (final u in allUsers) {
+      final uId = (u['id'] ?? u['uid'] ?? '').toString().toLowerCase();
+      final uUsername = (u['username'] ?? '').toString().toLowerCase();
+      final uEmail = (u['email'] ?? '').toString().toLowerCase();
+      final uName = (u['name'] ?? '').toString().toLowerCase();
+
+      final pCreated = p.createdBy.trim().toLowerCase();
+      final pAssigned = p.assignedStaffId.trim().toLowerCase();
+
+      if ((pCreated.isNotEmpty && (pCreated == uId || pCreated == uUsername || pCreated == uEmail)) ||
+          (pAssigned.isNotEmpty && (pAssigned == uId || pAssigned == uUsername || pAssigned == uEmail))) {
+        if (matchesStaffIdentifier(uUsername, staffIdentifiers) ||
+            matchesStaffIdentifier(uName, staffIdentifiers) ||
+            matchesStaffIdentifier(uEmail, staffIdentifiers) ||
+            matchesStaffIdentifier(uId, staffIdentifiers)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 5. Match from invoices (check all invoices for this patient, matching by patientId OR mrNumber)
+  if (allInvoices != null && allInvoices.isNotEmpty) {
+    final patientInvoices = allInvoices
+        .where((inv) =>
+            !inv.isDeleted &&
+            !inv.isDiscontinued &&
+            (inv.patientId == p.patientId ||
+             (p.mrNumber.isNotEmpty && inv.patientId == p.mrNumber)))
+        .toList();
+    if (patientInvoices.isNotEmpty) {
+      for (final inv in patientInvoices) {
+        if (matchesStaffIdentifier(inv.createdByName, staffIdentifiers) ||
+            matchesStaffIdentifier(inv.createdBy, staffIdentifiers) ||
+            matchesStaffIdentifier(inv.createdByUid, staffIdentifiers) ||
+            matchesStaffIdentifier(inv.staffId, staffIdentifiers)) {
+          return true;
+        }
+        if (legacyUidToName != null && inv.createdBy.isNotEmpty) {
+          final mapped = legacyUidToName[inv.createdBy.trim().toLowerCase()];
+          if (mapped != null && matchesStaffIdentifier(mapped, staffIdentifiers)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Caretaker match (if this staff member is explicitly listed as caretaker)
+  final caretaker = p.caretaker.trim();
+  if (caretaker.isNotEmpty && !isGenericStaffIdentifier(caretaker) && matchesStaffIdentifier(caretaker, staffIdentifiers)) {
+    return true;
+  }
+
+  // 7. Clinical Nurse/Doctor assignment (ONLY as fallback if patient has no other registered staff creator)
+  // Strict Ownership: If the patient was registered by a specific staff member (like Daniyal),
+  // a visiting nurse (like Ayaz) must NOT claim this patient or inflate Ayaz's finances.
+  final hasOtherCreator = _patientHasOtherRegisteredCreator(p, staffIdentifiers, legacyUidToName, activitiesCreators, allUsers);
+  if (!hasOtherCreator) {
+    final nurse = p.nurse.trim();
+    if (nurse.isNotEmpty && !isGenericStaffIdentifier(nurse) && matchesStaffIdentifier(nurse, staffIdentifiers)) {
+      return true;
+    }
+    final doctor = p.doctor.trim();
+    if (doctor.isNotEmpty && !isGenericStaffIdentifier(doctor) && matchesStaffIdentifier(doctor, staffIdentifiers)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+final allPatientsProvider = StreamProvider.family<List<Patient>, bool>((ref, includeDeleted) {
   return ref.watch(patientRepositoryProvider).watchAllPatients(includeDeleted: includeDeleted);
 });
 
-final staffPatientsProvider = StreamProvider.autoDispose<List<Patient>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
-  return ref.watch(patientRepositoryProvider).watchStaffPatients(user.id);
+final staffPatientsProvider = StreamProvider<List<Patient>>((ref) {
+  final staffIds = ref.watch(currentStaffIdentifiersProvider);
+  final allPatientsAsync = ref.watch(allPatientsProvider(false));
+  final allUsersAsync = ref.watch(allUsersProvider);
+  final allInvoicesAsync = ref.watch(allInvoicesProvider(false));
+  final activitiesCreatorsAsync = ref.watch(patientCreatorsMapProvider);
+  final legacyUidMapAsync = ref.watch(legacyUidToNameProvider);
+
+  if (allPatientsAsync.isLoading) {
+    return const Stream.empty();
+  }
+
+  return allPatientsAsync.when(
+    data: (allPatients) {
+      if (staffIds.isEmpty) return Stream.value(<Patient>[]);
+
+      final allUsers = allUsersAsync.value;
+      final allInvoices = allInvoicesAsync.value;
+      final activitiesCreators = activitiesCreatorsAsync.value;
+      final legacyUidMap = legacyUidMapAsync.value;
+
+      final list = allPatients.where((p) {
+        return matchesStaffPatient(
+          p,
+          staffIds,
+          allInvoices: allInvoices,
+          allUsers: allUsers,
+          activitiesCreators: activitiesCreators,
+          legacyUidToName: legacyUidMap,
+        );
+      }).toList();
+
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return Stream.value(list);
+    },
+    loading: () => const Stream.empty(),
+    error: (e, st) => Stream.error(e, st),
+  );
 });
 
 class PatientRepository {
@@ -24,7 +270,12 @@ class PatientRepository {
 
   PatientRepository({required SupabaseClient supabase}) : _supabase = supabase;
 
-  Stream<List<Patient>> watchStaffPatients(String staffId) {
+  Stream<List<Patient>> watchStaffPatients(String staffId, {Set<String>? staffIdentifiers}) {
+    final allIds = <String>{
+      if (staffId.isNotEmpty) staffId,
+      if (staffIdentifiers != null) ...staffIdentifiers,
+    };
+
     return _supabase
         .from('patients')
         .stream(primaryKey: ['id'])
@@ -32,7 +283,7 @@ class PatientRepository {
         .map((rows) {
           final list = rows
               .map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString()))
-              .where((p) => !p.isDeleted && (p.createdBy == staffId || p.assignedStaffId == staffId))
+              .where((p) => !p.isDeleted && matchesStaffPatient(p, allIds))
               .toList();
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;

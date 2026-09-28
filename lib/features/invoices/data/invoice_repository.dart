@@ -10,25 +10,52 @@ final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
   );
 });
 
+bool matchesStaffInvoice(
+  Invoice inv,
+  Set<String> staffPatientIds, {
+  Set<String>? staffIdentifiers,
+}) {
+  // 1. Strict Patient Ownership:
+  // If the invoice is linked to a patient, it belongs to the staff member who holds that patient
+  if (inv.patientId.isNotEmpty && staffPatientIds.contains(inv.patientId)) {
+    return true;
+  }
+  // 2. Direct Staff Invoice match (invoices created by or assigned to this staff member)
+  if (staffIdentifiers != null && staffIdentifiers.isNotEmpty) {
+    return matchesStaffIdentifier(inv.createdByName, staffIdentifiers) ||
+        matchesStaffIdentifier(inv.createdBy, staffIdentifiers) ||
+        matchesStaffIdentifier(inv.createdByUid, staffIdentifiers) ||
+        matchesStaffIdentifier(inv.staffId, staffIdentifiers);
+  }
+  return false;
+}
+
 class InvoiceRepository {
   final SupabaseClient _supabase;
 
   InvoiceRepository({required SupabaseClient supabase}) : _supabase = supabase;
 
-  Stream<List<Invoice>> watchStaffInvoices(String staffId, {Set<String>? staffPatientIds, int limit = 500}) {
+  Stream<List<Invoice>> watchStaffInvoices(
+    String staffId, {
+    Set<String>? staffIdentifiers,
+    Set<String>? staffPatientIds,
+    int limit = 500,
+  }) {
     return _supabase
         .from('invoices')
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .limit(limit)
         .map((rows) {
+          final pIds = staffPatientIds ?? {};
+          final sIds = staffIdentifiers ?? {};
+          if (pIds.isEmpty && sIds.isEmpty) return <Invoice>[];
+
           final list = rows
               .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
               .where((inv) {
                 if (inv.isDeleted || inv.isDiscontinued) return false;
-                final isForStaffPatient = staffPatientIds != null && staffPatientIds.contains(inv.patientId);
-                final isCreatedByStaff = inv.createdBy == staffId || inv.staffId == staffId;
-                return isForStaffPatient || isCreatedByStaff;
+                return matchesStaffInvoice(inv, pIds, staffIdentifiers: sIds);
               })
               .toList();
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -175,26 +202,40 @@ class InvoiceRepository {
 }
 
 final staffInvoicesProvider = StreamProvider<List<Invoice>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
-
+  final staffIdentifiers = ref.watch(currentStaffIdentifiersProvider);
   final staffPatientsAsync = ref.watch(staffPatientsProvider);
   final allInvoicesAsync = ref.watch(allInvoicesProvider(false));
 
-  final staffPatients = staffPatientsAsync.value ?? [];
-  final allInvoices = allInvoicesAsync.value ?? [];
+  if (allInvoicesAsync.isLoading || staffPatientsAsync.isLoading) {
+    return const Stream.empty();
+  }
 
-  final staffPatientIds = staffPatients.map((p) => p.patientId).toSet();
+  return allInvoicesAsync.when(
+    data: (allInvoices) {
+      final staffPatients = staffPatientsAsync.value ?? [];
+      final activePatients = staffPatients.where((p) => !p.isDiscontinued && !p.isDeleted).toList();
+      final staffPatientIds = <String>{};
+      for (final p in activePatients) {
+        if (p.patientId.isNotEmpty) staffPatientIds.add(p.patientId);
+        if (p.mrNumber.isNotEmpty) staffPatientIds.add(p.mrNumber);
+      }
 
-  final list = allInvoices.where((inv) {
-    if (inv.isDeleted || inv.isDiscontinued) return false;
-    final isForStaffPatient = staffPatientIds.contains(inv.patientId);
-    final isCreatedByStaff = inv.createdBy == user.id || inv.staffId == user.id;
-    return isForStaffPatient || isCreatedByStaff;
-  }).toList();
+      // If the staff member has no registered patients and no matching invoices, return empty
+      if (staffPatientIds.isEmpty && staffIdentifiers.isEmpty) {
+        return Stream.value(<Invoice>[]);
+      }
 
-  list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  return Stream.value(list);
+      final list = allInvoices.where((inv) {
+        if (inv.isDeleted || inv.isDiscontinued) return false;
+        return matchesStaffInvoice(inv, staffPatientIds, staffIdentifiers: staffIdentifiers);
+      }).toList();
+
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return Stream.value(list);
+    },
+    loading: () => const Stream.empty(),
+    error: (e, st) => Stream.error(e, st),
+  );
 });
 
 final allInvoicesProvider = StreamProvider.family<List<Invoice>, bool>((ref, includeDeleted) {

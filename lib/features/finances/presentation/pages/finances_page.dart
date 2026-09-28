@@ -50,7 +50,11 @@ class FinancesPage extends ConsumerWidget {
       data: (patients) {
         final activePatients = patients.where((p) => !p.isDiscontinued).toList();
         final invoices = invoicesAsync.value ?? [];
-        final patientMap = {for (final p in patients) p.patientId: p};
+        final patientMap = <String, Patient>{};
+        for (final p in patients) {
+          if (p.patientId.isNotEmpty) patientMap[p.patientId] = p;
+          if (p.mrNumber.isNotEmpty) patientMap[p.mrNumber] = p;
+        }
 
         double totalRevenue = 0;
         double totalPayout = 0;
@@ -59,11 +63,13 @@ class FinancesPage extends ConsumerWidget {
         // Calculate Revenue and Staff Expenditure from all valid invoices (both Paid and Unpaid)
         for (final inv in invoices) {
           if (!inv.isDiscontinued && !inv.isDeleted) {
+            final patient = patientMap[inv.patientId];
+            if (patient == null) continue;
+
             totalRevenue += inv.grandTotal;
 
-            final patient = patientMap[inv.patientId];
             double staffDailyRate = 0.0;
-            if (patient != null && patient.staffPayment > 0) {
+            if (patient.staffPayment > 0) {
               final pDays = patient.days > 0 ? patient.days : 30;
               staffDailyRate = patient.staffPayment / pDays;
             }
@@ -80,6 +86,13 @@ class FinancesPage extends ConsumerWidget {
         }
 
         totalProfit = totalRevenue - totalPayout;
+        if (invoices.isEmpty && activePatients.isNotEmpty) {
+          for (final p in activePatients) {
+            totalRevenue += p.patientAmount;
+            totalPayout += p.staffPayment;
+            totalProfit += p.profit;
+          }
+        }
 
         final formatter = NumberFormat('#,###');
 
@@ -177,40 +190,52 @@ class FinancesPage extends ConsumerWidget {
     final patientsAsync = ref.watch(staffPatientsProvider);
     final invoicesAsync = ref.watch(staffInvoicesProvider);
 
+    if (patientsAsync.isLoading || invoicesAsync.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0056B3)),
+        ),
+      );
+    }
+
     return patientsAsync.when(
       data: (patients) {
-        final activePatients = patients.where((p) => !p.isDiscontinued).toList();
+        final activePatients = patients.where((p) => !p.isDiscontinued && !p.isDeleted).toList();
         final invoices = invoicesAsync.value ?? [];
-        final patientMap = {for (final p in patients) p.patientId: p};
+        final patientMap = {for (final p in activePatients) p.patientId: p};
 
         double totalRevenue = 0;
         double totalPayout = 0;
         double totalProfit = 0;
 
-        // Calculate Revenue and Staff Expenditure from this staff member's valid invoices (Paid and Unpaid)
-        for (final inv in invoices) {
-          if (!inv.isDiscontinued && !inv.isDeleted) {
-            totalRevenue += inv.grandTotal;
+        // Calculate Revenue and Staff Expenditure strictly from this staff member's active managed patients
+        if (activePatients.isNotEmpty) {
+          for (final inv in invoices) {
+            if (!inv.isDiscontinued && !inv.isDeleted) {
+              final patient = patientMap[inv.patientId];
+              if (patient == null) continue;
 
-            final patient = patientMap[inv.patientId];
-            double staffDailyRate = 0.0;
-            if (patient != null && patient.staffPayment > 0) {
-              final pDays = patient.days > 0 ? patient.days : 30;
-              staffDailyRate = patient.staffPayment / pDays;
+              totalRevenue += inv.grandTotal;
+
+              double staffDailyRate = 0.0;
+              if (patient.staffPayment > 0) {
+                final pDays = patient.days > 0 ? patient.days : 30;
+                staffDailyRate = patient.staffPayment / pDays;
+              }
+
+              final invoiceDays = inv.days > 0
+                  ? inv.days
+                  : (inv.items.isNotEmpty && inv.items.first.quantity > 0
+                      ? inv.items.first.quantity
+                      : (inv.toDate != null && inv.fromDate != null
+                          ? inv.toDate!.difference(inv.fromDate!).inDays
+                          : 1));
+              totalPayout += invoiceDays * staffDailyRate;
             }
-
-            final invoiceDays = inv.days > 0
-                ? inv.days
-                : (inv.items.isNotEmpty && inv.items.first.quantity > 0
-                    ? inv.items.first.quantity
-                    : (inv.toDate != null && inv.fromDate != null
-                        ? inv.toDate!.difference(inv.fromDate!).inDays
-                        : 1));
-            totalPayout += invoiceDays * staffDailyRate;
           }
-        }
 
-        totalProfit = totalRevenue - totalPayout;
+          totalProfit = totalRevenue - totalPayout;
+        }
 
         final formatter = NumberFormat('#,###');
 

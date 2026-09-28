@@ -6,6 +6,8 @@ import '../domain/patient_model.dart';
 import '../data/patient_repository.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../core/errors/app_error.dart';
+import '../../invoices/data/invoice_repository.dart';
+import '../../dashboard/presentation/pages/dashboard_page.dart';
 import 'widgets/healthcare_services_selector.dart';
 
 class CnicInputFormatter extends TextInputFormatter {
@@ -261,6 +263,8 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
       ref.invalidate(allPatientsProvider(false));
       ref.invalidate(allPatientsProvider(true));
       ref.invalidate(staffPatientsProvider);
+      ref.invalidate(staffInvoicesProvider);
+      ref.invalidate(staffMetricsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

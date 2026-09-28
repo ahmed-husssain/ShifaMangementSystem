@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../analytics/presentation/activity_feed_widget.dart';
 import '../../../patients/data/patient_repository.dart';
+import '../../../patients/domain/patient_model.dart';
 import '../../../invoices/data/invoice_repository.dart';
 import '../../../patients/presentation/patient_form_screen.dart';
 import '../../../../shared/providers/plan_expiration_provider.dart';
@@ -79,24 +80,55 @@ final staffMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final patientsAsync = ref.watch(staffPatientsProvider);
   final invoicesAsync = ref.watch(staffInvoicesProvider);
 
+  if (patientsAsync.isLoading || invoicesAsync.isLoading) {
+    return const Stream.empty();
+  }
+
+  if (patientsAsync.hasError) {
+    return Stream.error(patientsAsync.error!, patientsAsync.stackTrace);
+  }
+  if (invoicesAsync.hasError) {
+    return Stream.error(invoicesAsync.error!, invoicesAsync.stackTrace);
+  }
+
   final patients = patientsAsync.value ?? [];
   final invoices = invoicesAsync.value ?? [];
 
-  final totalActivePatients = patients.where((p) => !p.isDiscontinued && !p.isDeleted).length;
-  final patientMap = {for (final p in patients) p.patientId: p};
+  final activePatients = patients.where((p) => !p.isDiscontinued && !p.isDeleted).toList();
+  final totalActivePatients = activePatients.length;
+
+  // Strict Guard: If staff has NO active managed patients, all their operational metrics are 0
+  if (totalActivePatients == 0) {
+    return Stream.value({
+      'totalPatients': 0,
+      'totalRevenue': 0.0,
+      'totalInvoices': 0,
+    });
+  }
+
+  final patientMap = <String, Patient>{};
+  for (final p in activePatients) {
+    if (p.patientId.isNotEmpty) patientMap[p.patientId] = p;
+    if (p.mrNumber.isNotEmpty) patientMap[p.mrNumber] = p;
+  }
 
   double totalRevenue = 0.0;
   double totalPayout = 0.0;
+  int activeInvoicesCount = 0;
 
   for (final inv in invoices) {
     if (!inv.isDeleted && !inv.isDiscontinued) {
+      // Must be tied directly to one of this staff's active managed patients
+      final patient = patientMap[inv.patientId];
+      if (patient == null) continue;
+
+      activeInvoicesCount++;
       // Both Paid and Unpaid valid invoices contribute to Revenue
       totalRevenue += inv.grandTotal;
 
       // Staff Expenditure = Invoice Days * Staff Daily Payment
-      final patient = patientMap[inv.patientId];
       double staffDailyRate = 0.0;
-      if (patient != null && patient.staffPayment > 0) {
+      if (patient.staffPayment > 0) {
         final pDays = patient.days > 0 ? patient.days : 30;
         staffDailyRate = patient.staffPayment / pDays;
       }
@@ -112,12 +144,19 @@ final staffMetricsProvider = StreamProvider<Map<String, dynamic>>((ref) {
     }
   }
 
-  final netProfit = totalRevenue - totalPayout;
+  double netProfit = totalRevenue - totalPayout;
+  if (activeInvoicesCount == 0 && totalActivePatients > 0) {
+    double plannedProfit = 0.0;
+    for (final p in activePatients) {
+      plannedProfit += p.profit;
+    }
+    netProfit = plannedProfit;
+  }
 
   return Stream.value({
     'totalPatients': totalActivePatients,
     'totalRevenue': netProfit,
-    'totalInvoices': invoices.length,
+    'totalInvoices': activeInvoicesCount,
   });
 });
 
