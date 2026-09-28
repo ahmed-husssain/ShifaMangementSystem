@@ -12,6 +12,7 @@ import '../../../invoices/data/invoice_repository.dart';
 import '../../../dashboard/presentation/widgets/schedule_notification_modal.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../../users/presentation/pages/users_page.dart';
 
 class RecordsPage extends ConsumerStatefulWidget {
   const RecordsPage({super.key});
@@ -1071,21 +1072,11 @@ class _PatientDetailsModal extends ConsumerWidget {
           ),
           const Divider(),
           _buildDetailRow(context, 'Registered On', dateStr),
-          FutureBuilder<Map<String, dynamic>?>(
-            future: Supabase.instance.client
-                .from('users')
-                .select()
-                .eq('id', patient.createdBy)
-                .maybeSingle(),
+          FutureBuilder<String>(
+            initialData: _getImmediateCreatorGuess(ref, patient),
+            future: _resolvePatientCreatorName(ref, patient),
             builder: (context, snapshot) {
-              String creatorName = 'Loading...';
-              if (snapshot.hasError) creatorName = 'Error loading creator';
-              if (snapshot.hasData && snapshot.data != null) {
-                final data = snapshot.data!;
-                creatorName = data['name'] ?? 'Unknown User';
-              } else if (snapshot.connectionState == ConnectionState.done) {
-                creatorName = 'Unknown (ID: ${patient.createdBy})';
-              }
+              final creatorName = snapshot.data ?? _getImmediateCreatorGuess(ref, patient);
               return _buildDetailRow(context, 'Created By', creatorName);
             },
           ),
@@ -1093,6 +1084,231 @@ class _PatientDetailsModal extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _formatStaffName(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return 'Staff';
+    final isAlnumId = RegExp(r'^[a-zA-Z0-9_-]{20,}$').hasMatch(trimmed);
+    if (isAlnumId) return 'Staff';
+    return trimmed.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      if (word.length == 1) return word.toUpperCase();
+      return word[0].toUpperCase() + word.substring(1);
+    }).join(' ');
+  }
+
+  String _getImmediateCreatorGuess(WidgetRef ref, Patient patient) {
+    // 1. Check if current staff member registered this patient
+    final staffIds = ref.read(currentStaffIdentifiersProvider);
+    if (matchesStaffIdentifier(patient.createdBy, staffIds)) {
+      final profile = ref.read(userProfileProvider).value;
+      final user = ref.read(authStateProvider).value;
+      final name = profile?['name'] ?? profile?['username'] ?? user?.email?.split('@').first;
+      if (name != null && name.toString().trim().isNotEmpty && !isGenericStaffIdentifier(name.toString())) {
+        return _formatStaffName(name.toString());
+      }
+    }
+
+    // 2. Check clinical staff fields (nurse/doctor/caretaker)
+    if (patient.nurse.trim().isNotEmpty &&
+        patient.nurse.trim().toUpperCase() != 'N/A' &&
+        patient.nurse.trim().toLowerCase() != 'none') {
+      return _formatStaffName(patient.nurse);
+    }
+
+    if (patient.doctor.trim().isNotEmpty &&
+        patient.doctor.trim().toUpperCase() != 'N/A' &&
+        patient.doctor.trim().toLowerCase() != 'none') {
+      return _formatStaffName(patient.doctor);
+    }
+
+    if (patient.caretaker.trim().isNotEmpty &&
+        patient.caretaker.trim().toUpperCase() != 'N/A' &&
+        patient.caretaker.trim().toLowerCase() != 'none' &&
+        patient.caretaker.trim().toLowerCase() != 'caretaker') {
+      return _formatStaffName(patient.caretaker);
+    }
+
+    return 'Staff';
+  }
+
+  Future<String> _resolvePatientCreatorName(WidgetRef ref, Patient patient) async {
+    // 1. Current logged-in user check
+    final staffIds = ref.read(currentStaffIdentifiersProvider);
+    if (matchesStaffIdentifier(patient.createdBy, staffIds)) {
+      final profile = ref.read(userProfileProvider).value;
+      final user = ref.read(authStateProvider).value;
+      final name = profile?['name'] ?? profile?['username'] ?? user?.email?.split('@').first;
+      if (name != null && name.toString().trim().isNotEmpty && !isGenericStaffIdentifier(name.toString())) {
+        return _formatStaffName(name.toString().trim());
+      }
+    }
+
+    // 2. In-memory allUsersProvider (cached list of all staff accounts)
+    try {
+      final allUsers = ref.read(allUsersProvider).value;
+      if (allUsers != null && allUsers.isNotEmpty) {
+        for (final u in allUsers) {
+          final uId = (u['id'] ?? u['uid'] ?? '').toString();
+          final uEmail = (u['email'] ?? '').toString();
+          final uUsername = (u['username'] ?? '').toString();
+          final uName = (u['name'] ?? '').toString();
+
+          if ((uId.isNotEmpty && uId.toLowerCase() == patient.createdBy.toLowerCase()) ||
+              (uEmail.isNotEmpty && uEmail.toLowerCase() == patient.createdBy.toLowerCase()) ||
+              (uUsername.isNotEmpty && uUsername.toLowerCase() == patient.createdBy.toLowerCase())) {
+            final resName = uName.isNotEmpty ? uName : (uUsername.isNotEmpty ? uUsername : uEmail.split('@').first);
+            if (resName.isNotEmpty && !isGenericStaffIdentifier(resName)) {
+              return _formatStaffName(resName);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. In-memory invoices check (invoice createdByName for this patient or matching creator ID)
+    try {
+      final activeInvoices = ref.read(allInvoicesProvider(false)).value ?? [];
+      final archivedInvoices = ref.read(allInvoicesProvider(true)).value ?? [];
+      final allInvs = [...activeInvoices, ...archivedInvoices];
+
+      // Priority 3a: Invoice specifically for this patient with createdByName
+      for (final inv in allInvs) {
+        if (inv.patientId == patient.patientId &&
+            inv.createdByName != null &&
+            inv.createdByName!.trim().isNotEmpty &&
+            !isGenericStaffIdentifier(inv.createdByName!)) {
+          return _formatStaffName(inv.createdByName!.trim());
+        }
+      }
+
+      // Priority 3b: Any invoice created by this creator ID with createdByName
+      for (final inv in allInvs) {
+        if ((inv.createdBy == patient.createdBy || inv.createdByUid == patient.createdBy) &&
+            inv.createdByName != null &&
+            inv.createdByName!.trim().isNotEmpty &&
+            !isGenericStaffIdentifier(inv.createdByName!)) {
+          return _formatStaffName(inv.createdByName!.trim());
+        }
+      }
+    } catch (_) {}
+
+    // 4. Supabase DB queries
+    // 4a. If patient.createdBy is a valid UUID, query users table by id
+    final isUuid = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(patient.createdBy);
+
+    if (isUuid) {
+      try {
+        final userDoc = await Supabase.instance.client
+            .from('users')
+            .select('name, username, email')
+            .eq('id', patient.createdBy)
+            .maybeSingle();
+        if (userDoc != null) {
+          final name = userDoc['name'] ?? userDoc['username'] ?? userDoc['email']?.toString().split('@').first;
+          if (name != null && name.toString().trim().isNotEmpty && !isGenericStaffIdentifier(name.toString())) {
+            return _formatStaffName(name.toString().trim());
+          }
+        }
+      } catch (_) {}
+    } else if (patient.createdBy.isNotEmpty) {
+      // Not a UUID: try username or email in users table
+      try {
+        final userDoc = await Supabase.instance.client
+            .from('users')
+            .select('name, username, email')
+            .or('username.ilike.${patient.createdBy},email.ilike.${patient.createdBy}')
+            .limit(1)
+            .maybeSingle();
+        if (userDoc != null) {
+          final name = userDoc['name'] ?? userDoc['username'] ?? userDoc['email']?.toString().split('@').first;
+          if (name != null && name.toString().trim().isNotEmpty && !isGenericStaffIdentifier(name.toString())) {
+            return _formatStaffName(name.toString().trim());
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4b. Query activities table for this patient entity_id
+    try {
+      final act = await Supabase.instance.client
+          .from('activities')
+          .select('user_name')
+          .eq('entity_id', patient.patientId)
+          .not('user_name', 'is', null)
+          .order('timestamp', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (act != null && act['user_name'] != null) {
+        final actName = act['user_name'].toString().trim();
+        if (actName.isNotEmpty && !isGenericStaffIdentifier(actName)) {
+          return _formatStaffName(actName);
+        }
+      }
+    } catch (_) {}
+
+    // 4c. Query activities table by user_id
+    if (patient.createdBy.isNotEmpty) {
+      try {
+        final act = await Supabase.instance.client
+            .from('activities')
+            .select('user_name')
+            .eq('user_id', patient.createdBy)
+            .not('user_name', 'is', null)
+            .order('timestamp', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (act != null && act['user_name'] != null) {
+          final actName = act['user_name'].toString().trim();
+          if (actName.isNotEmpty && !isGenericStaffIdentifier(actName)) {
+            return _formatStaffName(actName);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4d. Query invoices table in Supabase for this patient
+    try {
+      final inv = await Supabase.instance.client
+          .from('invoices')
+          .select('created_by_name')
+          .eq('patient_id', patient.patientId)
+          .not('created_by_name', 'is', null)
+          .limit(1)
+          .maybeSingle();
+      if (inv != null && inv['created_by_name'] != null) {
+        final invName = inv['created_by_name'].toString().trim();
+        if (invName.isNotEmpty && !isGenericStaffIdentifier(invName)) {
+          return _formatStaffName(invName);
+        }
+      }
+    } catch (_) {}
+
+    // 5. Clinical Fields Fallback (Nurse / Doctor / Caretaker)
+    if (patient.nurse.trim().isNotEmpty &&
+        patient.nurse.trim().toUpperCase() != 'N/A' &&
+        patient.nurse.trim().toLowerCase() != 'none') {
+      return _formatStaffName(patient.nurse.trim());
+    }
+
+    if (patient.doctor.trim().isNotEmpty &&
+        patient.doctor.trim().toUpperCase() != 'N/A' &&
+        patient.doctor.trim().toLowerCase() != 'none') {
+      return _formatStaffName(patient.doctor.trim());
+    }
+
+    if (patient.caretaker.trim().isNotEmpty &&
+        patient.caretaker.trim().toUpperCase() != 'N/A' &&
+        patient.caretaker.trim().toLowerCase() != 'none' &&
+        patient.caretaker.trim().toLowerCase() != 'caretaker') {
+      return _formatStaffName(patient.caretaker.trim());
+    }
+
+    // 6. Safe Final Fallback - NEVER return a raw GUID or "Unknown (ID: ...)"
+    return 'Staff';
   }
 
   Widget _buildDetailRow(BuildContext context, String label, String value) {

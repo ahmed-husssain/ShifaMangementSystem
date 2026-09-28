@@ -13,6 +13,7 @@ import 'pages/invoices_page.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../patients/domain/patient_model.dart';
 import '../../patients/data/patient_repository.dart';
+import '../../dashboard/presentation/pages/dashboard_page.dart';
 
 const Map<String, double> SERVICE_PRICES = {
   "SELECT SERVICE": 0,
@@ -155,11 +156,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
             .maybeSingle();
         if (docSnap != null) {
           final p = Patient.fromMap(docSnap, (docSnap['id'] ?? '').toString());
-          final user = ref.read(authStateProvider).value;
           final profile = ref.read(userProfileProvider).value;
           final role = profile?['role'] ?? 'staff';
+          final staffIds = ref.read(currentStaffIdentifiersProvider);
 
-          if (role == 'staff' && user != null && p.assignedStaffId != user.uid && p.createdBy != user.uid) {
+          if (role == 'staff' && !matchesStaffPatient(p, staffIds)) {
             setState(() {
               _isSearchingPatient = false;
               _searchStatusMessage = 'Access Denied: Patient belongs to another staff member.';
@@ -175,11 +176,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       if (snap.isNotEmpty) {
         final doc = snap.first;
         final p = Patient.fromMap(doc, (doc['id'] ?? '').toString());
-        final user = ref.read(authStateProvider).value;
         final profile = ref.read(userProfileProvider).value;
         final role = profile?['role'] ?? 'staff';
+        final staffIds = ref.read(currentStaffIdentifiersProvider);
 
-        if (role == 'staff' && user != null && p.assignedStaffId != user.uid && p.createdBy != user.uid) {
+        if (role == 'staff' && !matchesStaffPatient(p, staffIds)) {
           setState(() {
             _isSearchingPatient = false;
             _searchStatusMessage = 'Access Denied: Patient belongs to another staff member.';
@@ -491,6 +492,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       ref.invalidate(allInvoicesProvider(false));
       ref.invalidate(allInvoicesProvider(true));
       ref.invalidate(staffInvoicesProvider);
+      ref.invalidate(staffMetricsProvider);
 
       if (mounted) {
         // Highlight the newly created invoice on the Invoices page

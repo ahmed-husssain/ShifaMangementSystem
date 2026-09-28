@@ -80,6 +80,96 @@ final userProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
       .handleError((_) => fallbackProfile);
 });
 
+/// Returns true if a string is a generic placeholder that must never be used for identity matching.
+bool isGenericStaffIdentifier(String val) {
+  final lower = val.trim().toLowerCase();
+  return lower == 'user' ||
+      lower == 'staff' ||
+      lower == 'admin' ||
+      lower == 'staff user' ||
+      lower == 'admin user' ||
+      lower == 'user user' ||
+      lower == 'default' ||
+      lower == 'system' ||
+      lower == 'n/a' ||
+      lower == 'na' ||
+      lower == 'none' ||
+      lower == 'null' ||
+      lower == 'caretaker' ||
+      lower.isEmpty;
+}
+
+/// Provider that extracts all genuine identifiers (UUID, specific username, specific name, email, email prefix) for the currently authenticated user.
+final currentStaffIdentifiersProvider = Provider<Set<String>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  final profile = ref.watch(userProfileProvider).value;
+
+  final ids = <String>{};
+  if (user != null) {
+    if (user.id.isNotEmpty) ids.add(user.id.trim().toLowerCase());
+    if (user.email != null && user.email!.isNotEmpty) {
+      final cleanEmail = user.email!.trim().toLowerCase();
+      ids.add(cleanEmail);
+      final emailPrefix = cleanEmail.split('@').first.trim();
+      if (emailPrefix.isNotEmpty && !isGenericStaffIdentifier(emailPrefix)) {
+        ids.add(emailPrefix);
+      }
+    }
+    final metaUsername = (user.userMetadata?['username'] ?? '').toString().trim().toLowerCase();
+    final metaName = (user.userMetadata?['name'] ?? '').toString().trim().toLowerCase();
+    if (metaUsername.isNotEmpty && !isGenericStaffIdentifier(metaUsername)) ids.add(metaUsername);
+    if (metaName.isNotEmpty && !isGenericStaffIdentifier(metaName)) ids.add(metaName);
+  }
+  if (profile != null) {
+    final uid = (profile['uid'] ?? profile['id'] ?? '').toString().trim().toLowerCase();
+    final username = (profile['username'] ?? '').toString().trim().toLowerCase();
+    final name = (profile['name'] ?? '').toString().trim().toLowerCase();
+    final email = (profile['email'] ?? '').toString().trim().toLowerCase();
+
+    if (uid.isNotEmpty) ids.add(uid);
+    if (username.isNotEmpty && !isGenericStaffIdentifier(username)) ids.add(username);
+    if (name.isNotEmpty && !isGenericStaffIdentifier(name)) ids.add(name);
+    if (email.isNotEmpty && !isGenericStaffIdentifier(email)) ids.add(email);
+  }
+  return ids;
+});
+
+/// Resilient exact match (case-insensitive & trimmed) against the staff's known identifiers.
+bool matchesStaffIdentifier(String? value, Set<String> staffIdentifiers) {
+  if (value == null || staffIdentifiers.isEmpty) return false;
+  final cleanVal = value.trim().toLowerCase();
+  if (cleanVal.isEmpty || isGenericStaffIdentifier(cleanVal)) return false;
+
+  // Direct exact match
+  if (staffIdentifiers.contains(cleanVal)) return true;
+
+  // If cleanVal is an email (e.g. "ali@internal.shifa.app"), check its prefix ("ali")
+  if (cleanVal.contains('@')) {
+    final prefix = cleanVal.split('@').first.trim();
+    if (prefix.isNotEmpty && !isGenericStaffIdentifier(prefix) && staffIdentifiers.contains(prefix)) {
+      return true;
+    }
+  }
+
+  // If any staffIdentifier is an email, check if its prefix matches cleanVal
+  for (final id in staffIdentifiers) {
+    if (id.contains('@')) {
+      final idPrefix = id.split('@').first.trim();
+      if (idPrefix.isNotEmpty && idPrefix == cleanVal) return true;
+    }
+  }
+
+  // Word/token match: check if cleanVal contains any staff identifier as a distinct word
+  final words = cleanVal.split(RegExp(r'[\s,._\-/]+'));
+  for (final word in words) {
+    if (word.length >= 3 && !isGenericStaffIdentifier(word) && staffIdentifiers.contains(word)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 final authControllerProvider = Provider<AuthController>((ref) {
   return AuthController(
     supabase: ref.watch(supabaseClientProvider),
