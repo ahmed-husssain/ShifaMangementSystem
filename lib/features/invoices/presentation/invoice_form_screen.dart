@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/errors/app_error.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
-import 'package:path_provider/path_provider.dart';
 import '../domain/invoice_model.dart';
 import '../data/invoice_repository.dart';
 import '../utils/invoice_exporter.dart';
@@ -560,74 +557,21 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       }
     }
 
-    if (kIsWeb) {
-      await Printing.sharePdf(bytes: exportBytes, filename: fullFileName);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✓ Saved $fullFileName directly to Downloads'),
-            backgroundColor: const Color(0xFF16A34A),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } else {
-      bool isSavedToGallery = false;
-      List<String> savedPaths = [];
+    final result = await InvoiceExporter.saveInvoiceToDevice(
+      bytes: exportBytes,
+      fullFileName: fullFileName,
+      format: ext,
+    );
 
-      if (Platform.isAndroid && (ext == 'png' || ext == 'jpg')) {
-        try {
-          const channel = MethodChannel('com.shifa.shifa_management/media_scanner');
-          await channel.invokeMethod('saveImageToGallery', {
-            'bytes': Uint8List.fromList(exportBytes),
-            'filename': fullFileName,
-          });
-          isSavedToGallery = true;
-        } catch (_) {}
-      }
-
-      if (Platform.isAndroid) {
-        final downloadDir = Directory('/storage/emulated/0/Download');
-        if (await downloadDir.exists()) {
-          final file = File('${downloadDir.path}/$fullFileName');
-          await file.writeAsBytes(exportBytes);
-          savedPaths.add(file.path);
-        }
-      }
-
-      if (savedPaths.isEmpty) {
-        Directory? dir;
-        try {
-          dir = await getDownloadsDirectory();
-        } catch (_) {}
-        dir ??= await getApplicationDocumentsDirectory();
-
-        final file = File('${dir.path}/$fullFileName');
-        await file.writeAsBytes(exportBytes);
-        savedPaths.add(file.path);
-      }
-
-      for (final path in savedPaths) {
-        try {
-          const channel = MethodChannel('com.shifa.shifa_management/media_scanner');
-          await channel.invokeMethod('scanFile', {'path': path});
-        } catch (_) {}
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isSavedToGallery
-                  ? '✓ Saved $fullFileName directly to Photos Gallery & Downloads'
-                  : '✓ Saved $fullFileName directly to Downloads folder',
-            ),
-            backgroundColor: const Color(0xFF16A34A),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? const Color(0xFF16A34A) : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 

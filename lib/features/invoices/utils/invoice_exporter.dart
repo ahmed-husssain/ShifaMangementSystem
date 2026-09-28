@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show rootBundle, MethodChannel;
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -627,4 +630,123 @@ class InvoiceExporter {
     }
     throw Exception('Failed to rasterize invoice');
   }
+
+  /// Downloads/saves the invoice directly to the device.
+  /// On Android: Uses MediaStore to save directly into Downloads folder and Gallery (for images).
+  /// On iOS/Web/Desktop: Uses standard system downloads or system share sheet fallback.
+  static Future<InvoiceSaveResult> saveInvoiceToDevice({
+    required Uint8List bytes,
+    required String fullFileName,
+    required String format, // 'pdf', 'png', 'jpeg', 'jpg'
+  }) async {
+    final lowerFormat = format.toLowerCase();
+    final isImage = lowerFormat == 'png' || lowerFormat == 'jpg' || lowerFormat == 'jpeg';
+    final mimeType = lowerFormat == 'pdf'
+        ? 'application/pdf'
+        : (lowerFormat == 'png' ? 'image/png' : 'image/jpeg');
+
+    if (kIsWeb) {
+      await Printing.sharePdf(bytes: bytes, filename: fullFileName);
+      return InvoiceSaveResult(
+        success: true,
+        message: 'Saved $fullFileName to Downloads',
+      );
+    }
+
+    if (Platform.isAndroid) {
+      bool savedToGallery = false;
+      bool savedToDownloads = false;
+      const channel = MethodChannel('com.shifa.shifa_management/media_scanner');
+
+      // 1. If image, save to Photos Gallery via MediaStore
+      if (isImage) {
+        try {
+          await channel.invokeMethod('saveImageToGallery', {
+            'bytes': bytes,
+            'filename': fullFileName,
+          });
+          savedToGallery = true;
+        } catch (_) {}
+      }
+
+      // 2. Save to public Downloads via MediaStore Downloads
+      try {
+        await channel.invokeMethod('saveFileToDownloads', {
+          'bytes': bytes,
+          'filename': fullFileName,
+          'mimeType': mimeType,
+        });
+        savedToDownloads = true;
+      } catch (_) {}
+
+      if (savedToDownloads || savedToGallery) {
+        String msg;
+        if (savedToGallery && savedToDownloads) {
+          msg = '✓ Saved $fullFileName to Photos Gallery & Downloads (ShifaInvoices)';
+        } else if (savedToGallery) {
+          msg = '✓ Saved $fullFileName to Photos Gallery (ShifaInvoices)';
+        } else {
+          msg = '✓ Saved $fullFileName to Downloads folder (ShifaInvoices)';
+        }
+        return InvoiceSaveResult(
+          success: true,
+          message: msg,
+          isSavedToGallery: savedToGallery,
+          isSavedToDownloads: savedToDownloads,
+        );
+      }
+    }
+
+    // Fallback for iOS or if Android MediaStore channel is unavailable
+    try {
+      Directory? dir;
+      try {
+        dir = await getDownloadsDirectory();
+      } catch (_) {}
+      dir ??= await getApplicationDocumentsDirectory();
+
+      final file = File('${dir.path}/$fullFileName');
+      await file.writeAsBytes(bytes);
+
+      if (Platform.isIOS) {
+        await Printing.sharePdf(bytes: bytes, filename: fullFileName);
+        return InvoiceSaveResult(
+          success: true,
+          message: '✓ Saved $fullFileName (Select "Save to Files" or app of choice)',
+        );
+      }
+
+      return InvoiceSaveResult(
+        success: true,
+        message: '✓ Saved $fullFileName to ${file.path}',
+      );
+    } catch (e) {
+      try {
+        await Printing.sharePdf(bytes: bytes, filename: fullFileName);
+        return InvoiceSaveResult(
+          success: true,
+          message: '✓ Opened share sheet for $fullFileName',
+        );
+      } catch (shareErr) {
+        return InvoiceSaveResult(
+          success: false,
+          message: 'Failed to save $fullFileName: $e',
+        );
+      }
+    }
+  }
+}
+
+class InvoiceSaveResult {
+  final bool success;
+  final String message;
+  final bool isSavedToGallery;
+  final bool isSavedToDownloads;
+
+  const InvoiceSaveResult({
+    required this.success,
+    required this.message,
+    this.isSavedToGallery = false,
+    this.isSavedToDownloads = false,
+  });
 }
