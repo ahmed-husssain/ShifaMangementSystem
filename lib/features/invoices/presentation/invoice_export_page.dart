@@ -1,12 +1,8 @@
-import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
-import 'package:path_provider/path_provider.dart';
 import '../domain/invoice_model.dart';
 import '../utils/invoice_exporter.dart';
 import '../data/invoice_repository.dart';
@@ -19,6 +15,7 @@ class InvoiceExportPage extends ConsumerWidget {
   Future<void> _exportFile(BuildContext context, WidgetRef ref, String format) async {
     try {
       if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -52,7 +49,7 @@ class InvoiceExportPage extends ConsumerWidget {
       } else if (format == 'png') {
         bytes = await InvoiceExporter.generateImage(invoice, isPng: true);
         extension = 'png';
-      } else if (format == 'jpeg') {
+      } else if (format == 'jpeg' || format == 'jpg') {
         bytes = await InvoiceExporter.generateImage(invoice, isPng: false);
         extension = 'jpg';
       } else {
@@ -62,77 +59,23 @@ class InvoiceExportPage extends ConsumerWidget {
 
       final fullFileName = '$fileName.$extension';
 
-      if (kIsWeb) {
-        if (context.mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        await Printing.sharePdf(
-          bytes: bytes,
-          filename: fullFileName,
-        );
-      } else {
-        bool isSavedToGallery = false;
-
-        if (Platform.isAndroid &&
-            (fullFileName.endsWith('.png') ||
-                fullFileName.endsWith('.jpg') ||
-                fullFileName.endsWith('.jpeg'))) {
-          try {
-            final channel =
-                MethodChannel('com.shifa.shifa_management/media_scanner');
-            await channel.invokeMethod('saveImageToGallery', {
-              'bytes': Uint8List.fromList(bytes),
-              'filename': fullFileName,
-            });
-            isSavedToGallery = true;
-          } catch (_) {}
-        }
-
-        List<String> savedPaths = [];
-        if (Platform.isAndroid) {
-          final downloadDir = Directory('/storage/emulated/0/Download');
-          if (await downloadDir.exists()) {
-            final file = File('${downloadDir.path}/$fullFileName');
-            await file.writeAsBytes(bytes);
-            savedPaths.add(file.path);
-          }
-        }
-
-        if (savedPaths.isEmpty) {
-          Directory? dir;
-          try {
-            dir = await getDownloadsDirectory();
-          } catch (_) {}
-          dir ??= await getApplicationDocumentsDirectory();
-
-          final file = File('${dir.path}/$fullFileName');
-          await file.writeAsBytes(bytes);
-          savedPaths.add(file.path);
-        }
-
-        for (final path in savedPaths) {
-          try {
-            final channel = MethodChannel('com.shifa.shifa_management/media_scanner');
-            await channel.invokeMethod('scanFile', {'path': path});
-          } catch (_) {}
-        }
-
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                isSavedToGallery
-                    ? '✓ Saved $fullFileName directly to Photos Gallery & Downloads'
-                    : '✓ Saved $fullFileName to Downloads folder',
-              ),
-              backgroundColor: const Color(0xFF16A34A),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      }
+      final result = await InvoiceExporter.saveInvoiceToDevice(
+        bytes: bytes,
+        fullFileName: fullFileName,
+        format: format,
+      );
 
       if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: result.success ? const Color(0xFF16A34A) : Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
         ref.invalidate(staffInvoicesProvider);
         ref.invalidate(allInvoicesProvider(false));
       }
@@ -143,7 +86,25 @@ class InvoiceExportPage extends ConsumerWidget {
           SnackBar(
             content: Text('Export failed: $e'),
             backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
           ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareFile(BuildContext context) async {
+    try {
+      final pdfBytes = await InvoiceExporter.generatePdf(invoice);
+      final invoiceNum = invoice.invoiceNumber.isNotEmpty
+          ? invoice.invoiceNumber
+          : (invoice.invoiceId.length > 8 ? invoice.invoiceId.substring(0, 8) : invoice.invoiceId);
+      final fullFileName = 'invoice_$invoiceNum.pdf';
+      await Printing.sharePdf(bytes: pdfBytes, filename: fullFileName);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $e'), backgroundColor: Colors.red.shade700),
         );
       }
     }
@@ -170,12 +131,17 @@ class InvoiceExportPage extends ConsumerWidget {
             tooltip: 'Export JPEG',
             onPressed: () => _exportFile(context, ref, 'jpeg'),
           ),
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Share Invoice',
+            onPressed: () => _shareFile(context),
+          ),
         ],
       ),
       body: PdfPreview(
         build: (format) => InvoiceExporter.generatePdf(invoice),
         allowPrinting: true,
-        allowSharing: false, // We use custom app bar actions for direct format exports
+        allowSharing: true,
         canChangeOrientation: false,
         canChangePageFormat: false, // Force A4
         initialPageFormat: PdfPageFormat.a4,
