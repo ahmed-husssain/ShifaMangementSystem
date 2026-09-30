@@ -61,3 +61,11 @@ backups/
 *.real.dart
 lib/firebase_options*.dart
 *HomeHealthCare.mp4
+# Dependencies & Build Binaries
+node_modules/
+functions/node_modules/
+*.apk
+*.aab
+*.sha1
+*.idsig
+*.secret*
