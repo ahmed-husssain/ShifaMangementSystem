@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/errors/app_error.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
 import '../domain/invoice_model.dart';
 import '../data/invoice_repository.dart';
 import '../utils/invoice_exporter.dart';
+import 'invoice_export_page.dart';
 import 'pages/invoices_page.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../patients/domain/patient_model.dart';
@@ -494,28 +493,36 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       ref.invalidate(staffInvoicesProvider);
       ref.invalidate(staffMetricsProvider);
 
+      final savedInvoice = Invoice(
+        invoiceId: newDocId,
+        invoiceNumber: _invoiceNumber ?? (invoice.invoiceNumber != 'N/A' ? invoice.invoiceNumber : 'SHHC-5000'),
+        patientId: _patient!.patientId,
+        staffId: user.uid,
+        subtotal: _subtotal,
+        discount: _discount,
+        grandTotal: _grandTotal,
+        items: _items,
+        organizationId: 'default',
+        createdBy: user.uid,
+        createdByUid: user.uid,
+        createdByName: userName,
+        createdByRole: userRole,
+        createdAt: invoice.createdAt,
+        updatedBy: user.uid,
+        updatedAt: invoice.updatedAt,
+        isDeleted: false,
+        paymentStatus: _paymentStatus,
+        fromDate: _fromDate,
+        toDate: _toDate,
+        days: invoiceDays,
+      );
+
       if (mounted) {
         // Highlight the newly created invoice on the Invoices page
         ref.read(recentInvoiceHighlightProvider.notifier).setHighlight(newDocId);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Invoice generated successfully! Redirecting to Invoices...'),
-            backgroundColor: Color(0xFF16A34A),
-            duration: Duration(seconds: 3),
-          ),
-        );
-
-        // Perform export / direct file save action
-        await _showExportOptions(invoice, format);
-
-        // Redirect to Invoices screen where newly created invoice will be highlighted
-        if (mounted) {
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          }
-          context.go('/invoices');
-        }
+        // Perform export and transition smoothly to InvoiceExportPage
+        await _exportAndNavigate(savedInvoice, format);
       }
     } catch (e) {
       if (mounted) {
@@ -529,51 +536,114 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     }
   }
 
-  Future<void> _showExportOptions(Invoice invoice, String format) async {
-    // Generate PDF bytes first
-    final pdfBytes = await InvoiceExporter.generatePdf(
-      invoice,
-      patient: _patient,
-      invoiceNumber: _invoiceNumber ?? 'N/A',
-    );
-    
-    final safePatientName = (_patient?.patientName ?? 'Patient').replaceAll(' ', '_');
-    final mrNumber = (_patient?.mrNumber ?? 'MR').replaceAll(' ', '_');
-    final fileName = 'invoice_${safePatientName}_$mrNumber';
+  Future<void> _exportAndNavigate(Invoice savedInvoice, String format) async {
+    final cleanInvoiceNum = (savedInvoice.invoiceNumber.isNotEmpty && savedInvoice.invoiceNumber != 'N/A')
+        ? savedInvoice.invoiceNumber
+        : (savedInvoice.invoiceId.length > 8 ? savedInvoice.invoiceId.substring(0, 8) : savedInvoice.invoiceId);
+    final fileName = 'invoice_$cleanInvoiceNum';
 
-    if (format == 'PRINT') {
+    String? successMessage;
+    String? errorMessage;
+
+    if (format.toUpperCase() == 'PRINT') {
       if (mounted) {
-        await Printing.layoutPdf(onLayout: (_) => pdfBytes, name: fileName);
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => InvoiceExportPage(
+              invoice: savedInvoice,
+              patient: _patient,
+            ),
+          ),
+        );
       }
       return;
     }
 
-    final ext = format.toLowerCase() == 'jpg' ? 'jpg' : (format.toLowerCase() == 'png' ? 'png' : 'pdf');
-    final fullFileName = '$fileName.$ext';
+    try {
+      Uint8List bytes;
+      String extension;
 
-    Uint8List exportBytes = pdfBytes;
-    if (format == 'PNG' || format == 'JPG') {
-      await for (final page in Printing.raster(pdfBytes, pages: [0], dpi: 300)) {
-        exportBytes = await page.toPng();
-        break; // Only export the first page for images
+      if (format.toUpperCase() == 'PDF') {
+        bytes = await InvoiceExporter.generatePdf(
+          savedInvoice,
+          patient: _patient,
+          invoiceNumber: cleanInvoiceNum,
+        );
+        extension = 'pdf';
+      } else if (format.toUpperCase() == 'PNG') {
+        bytes = await InvoiceExporter.generateImage(
+          savedInvoice,
+          patient: _patient,
+          invoiceNumber: cleanInvoiceNum,
+          isPng: true,
+        );
+        extension = 'png';
+      } else if (format.toUpperCase() == 'JPG' || format.toUpperCase() == 'JPEG') {
+        bytes = await InvoiceExporter.generateImage(
+          savedInvoice,
+          patient: _patient,
+          invoiceNumber: cleanInvoiceNum,
+          isPng: false,
+        );
+        extension = 'jpg';
+      } else {
+        bytes = await InvoiceExporter.generatePdf(
+          savedInvoice,
+          patient: _patient,
+          invoiceNumber: cleanInvoiceNum,
+        );
+        extension = 'pdf';
       }
+
+      final fullFileName = '$fileName.$extension';
+
+      final result = await InvoiceExporter.saveInvoiceToDevice(
+        bytes: bytes,
+        fullFileName: fullFileName,
+        format: extension,
+      );
+
+      if (result.success) {
+        successMessage = result.message;
+      } else {
+        errorMessage = result.message;
+      }
+    } catch (e) {
+      errorMessage = 'Export failed: $e';
     }
 
-    final result = await InvoiceExporter.saveInvoiceToDevice(
-      bytes: exportBytes,
-      fullFileName: fullFileName,
-      format: ext,
-    );
-
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message),
-          backgroundColor: result.success ? const Color(0xFF16A34A) : Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
+      // Transition smoothly from creation form to the InvoiceExportPage
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => InvoiceExportPage(
+            invoice: savedInvoice,
+            patient: _patient,
+          ),
         ),
       );
+
+      // Display the feedback SnackBar on the preview screen
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else if (successMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(successMessage),
+            backgroundColor: const Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
