@@ -58,6 +58,9 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   DateTime _toDate = DateTime.now();
   String? _invoiceNumber;
 
+  int _days = 15;
+  final List<TextEditingController> _itemDaysControllers = [];
+
   final TextEditingController _mrNumberController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -69,6 +72,8 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   @override
   void initState() {
     super.initState();
+    _days = widget.defaultDays > 0 ? widget.defaultDays : 15;
+    _toDate = _fromDate.add(Duration(days: _days));
     if (widget.patientId != null && widget.patientId!.isNotEmpty) {
       _loadPatient();
     }
@@ -82,6 +87,10 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _cnicController.dispose();
+    for (final c in _itemDaysControllers) {
+      c.dispose();
+    }
+    _itemDaysControllers.clear();
     super.dispose();
   }
 
@@ -273,6 +282,13 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     );
   }
 
+  int _calculateDaysBetween(DateTime from, DateTime to) {
+    final fromDateOnly = DateTime(from.year, from.month, from.day);
+    final toDateOnly = DateTime(to.year, to.month, to.day);
+    final diff = toDateOnly.difference(fromDateOnly).inDays;
+    return diff > 0 ? diff : 1;
+  }
+
   void _populatePatientData(Patient p, {int defaultDays = 15}) {
     final effectiveDays = p.days > 0 ? p.days : defaultDays;
     setState(() {
@@ -284,10 +300,16 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       _cnicController.text = p.cnic;
       _isSearchingPatient = false;
 
+      _days = effectiveDays;
       _toDate = _fromDate.add(Duration(days: effectiveDays));
 
       // Automatically populate invoice items with patient's registered services
       _items.clear();
+      for (final c in _itemDaysControllers) {
+        c.dispose();
+      }
+      _itemDaysControllers.clear();
+
       if (p.selectedServices.isNotEmpty) {
         for (final s in p.selectedServices) {
           final sName = (s['serviceName'] ?? s['name'] ?? '').toString();
@@ -306,6 +328,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
               price: price,
               quantity: effectiveDays,
             ));
+            _itemDaysControllers.add(TextEditingController(text: effectiveDays.toString()));
           }
         }
       }
@@ -318,11 +341,13 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           price: dailyPrice > 0 ? dailyPrice : p.patientAmount,
           quantity: effectiveDays,
         ));
+        _itemDaysControllers.add(TextEditingController(text: effectiveDays.toString()));
       }
 
       // If still empty, add default blank service row
       if (_items.isEmpty) {
         _items.add(InvoiceItem(serviceName: '', price: 0, quantity: effectiveDays));
+        _itemDaysControllers.add(TextEditingController(text: effectiveDays.toString()));
       }
 
       _searchStatusMessage = '✓ Loaded patient ${p.patientName} & calculated for $effectiveDays days (${_items.length} service(s))';
@@ -331,13 +356,18 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
   void _addItem() {
     setState(() {
-      _items.add(InvoiceItem(serviceName: '', price: 0, quantity: 1));
+      _items.add(InvoiceItem(serviceName: '', price: 0, quantity: _days));
+      _itemDaysControllers.add(TextEditingController(text: _days.toString()));
     });
   }
 
   void _removeItem(int index) {
     setState(() {
       _items.removeAt(index);
+      if (index < _itemDaysControllers.length) {
+        _itemDaysControllers[index].dispose();
+        _itemDaysControllers.removeAt(index);
+      }
     });
   }
 
@@ -348,6 +378,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         price: price ?? _items[index].price,
         quantity: qty ?? _items[index].quantity,
       );
+      if (qty != null && index < _itemDaysControllers.length) {
+        if (_itemDaysControllers[index].text != qty.toString()) {
+          _itemDaysControllers[index].text = qty.toString();
+        }
+      }
     });
   }
 
@@ -658,8 +693,28 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       setState(() {
         if (isFrom) {
           _fromDate = picked;
+          if (_toDate.isBefore(_fromDate)) {
+            _toDate = _fromDate.add(Duration(days: _days > 0 ? _days : 1));
+          }
         } else {
           _toDate = picked;
+          if (_toDate.isBefore(_fromDate)) {
+            _fromDate = _toDate;
+          }
+        }
+
+        final calculatedDays = _calculateDaysBetween(_fromDate, _toDate);
+        _days = calculatedDays;
+
+        for (int i = 0; i < _items.length; i++) {
+          _items[i] = InvoiceItem(
+            serviceName: _items[i].serviceName,
+            price: _items[i].price,
+            quantity: calculatedDays,
+          );
+        }
+        for (final c in _itemDaysControllers) {
+          c.text = calculatedDays.toString();
         }
       });
     }
@@ -1362,26 +1417,35 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                               borderRadius: BorderRadius.circular(4),
                                               color: Colors.white,
                                             ),
-                                            child: TextFormField(
-                                              key: Key('qty_${idx}_${item.serviceName}'),
-                                              initialValue: item.quantity.toString(),
-                                              keyboardType: TextInputType.number,
-                                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              decoration: const InputDecoration(
-                                                isDense: true,
-                                                border: InputBorder.none,
-                                                contentPadding: EdgeInsets.symmetric(vertical: 4),
-                                                hintText: '1',
-                                              ),
-                                              onChanged: (val) => _updateItem(
-                                                idx,
-                                                qty: int.tryParse(val) ?? 1,
-                                              ),
+                                            child: Builder(
+                                              builder: (context) {
+                                                while (_itemDaysControllers.length <= idx) {
+                                                  _itemDaysControllers.add(TextEditingController(text: item.quantity.toString()));
+                                                }
+                                                return TextFormField(
+                                                  controller: _itemDaysControllers[idx],
+                                                  keyboardType: TextInputType.number,
+                                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  decoration: const InputDecoration(
+                                                    isDense: true,
+                                                    border: InputBorder.none,
+                                                    contentPadding: EdgeInsets.symmetric(vertical: 4),
+                                                    hintText: '1',
+                                                  ),
+                                                  onChanged: (val) {
+                                                    final qty = int.tryParse(val) ?? 1;
+                                                    _updateItem(
+                                                      idx,
+                                                      qty: qty,
+                                                    );
+                                                  },
+                                                );
+                                              },
                                             ),
                                           ),
                                         ),
