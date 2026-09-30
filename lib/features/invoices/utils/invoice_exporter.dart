@@ -645,11 +645,18 @@ class InvoiceExporter {
         ? 'application/pdf'
         : (lowerFormat == 'png' ? 'image/png' : 'image/jpeg');
 
+    // Clean filename: remove illegal filesystem/MediaStore characters
+    final lastDot = fullFileName.lastIndexOf('.');
+    final baseName = lastDot != -1 ? fullFileName.substring(0, lastDot) : fullFileName;
+    final extension = lastDot != -1 ? fullFileName.substring(lastDot) : '';
+    final sanitizedBase = baseName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final cleanFileName = '$sanitizedBase$extension';
+
     if (kIsWeb) {
-      await Printing.sharePdf(bytes: bytes, filename: fullFileName);
+      await Printing.sharePdf(bytes: bytes, filename: cleanFileName);
       return InvoiceSaveResult(
         success: true,
-        message: 'Saved $fullFileName to Downloads',
+        message: 'Saved $cleanFileName to Downloads',
       );
     }
 
@@ -663,7 +670,7 @@ class InvoiceExporter {
         try {
           await channel.invokeMethod('saveImageToGallery', {
             'bytes': bytes,
-            'filename': fullFileName,
+            'filename': cleanFileName,
           });
           savedToGallery = true;
         } catch (_) {}
@@ -673,7 +680,7 @@ class InvoiceExporter {
       try {
         await channel.invokeMethod('saveFileToDownloads', {
           'bytes': bytes,
-          'filename': fullFileName,
+          'filename': cleanFileName,
           'mimeType': mimeType,
         });
         savedToDownloads = true;
@@ -682,11 +689,11 @@ class InvoiceExporter {
       if (savedToDownloads || savedToGallery) {
         String msg;
         if (savedToGallery && savedToDownloads) {
-          msg = '✓ Saved $fullFileName to Photos Gallery & Downloads (ShifaInvoices)';
+          msg = '✓ Saved $cleanFileName to Photos Gallery & Downloads (ShifaInvoices)';
         } else if (savedToGallery) {
-          msg = '✓ Saved $fullFileName to Photos Gallery (ShifaInvoices)';
+          msg = '✓ Saved $cleanFileName to Photos Gallery (ShifaInvoices)';
         } else {
-          msg = '✓ Saved $fullFileName to Downloads folder (ShifaInvoices)';
+          msg = '✓ Saved $cleanFileName to Downloads folder (ShifaInvoices)';
         }
         return InvoiceSaveResult(
           success: true,
@@ -705,32 +712,32 @@ class InvoiceExporter {
       } catch (_) {}
       dir ??= await getApplicationDocumentsDirectory();
 
-      final file = File('${dir.path}/$fullFileName');
+      final file = File('${dir.path}/$cleanFileName');
       await file.writeAsBytes(bytes);
 
       if (Platform.isIOS) {
-        await Printing.sharePdf(bytes: bytes, filename: fullFileName);
+        await Printing.sharePdf(bytes: bytes, filename: cleanFileName);
         return InvoiceSaveResult(
           success: true,
-          message: '✓ Saved $fullFileName (Select "Save to Files" or app of choice)',
+          message: '✓ Saved $cleanFileName (Select "Save to Files" or app of choice)',
         );
       }
 
       return InvoiceSaveResult(
         success: true,
-        message: '✓ Saved $fullFileName to ${file.path}',
+        message: '✓ Saved $cleanFileName to ${file.path}',
       );
     } catch (e) {
       try {
-        await Printing.sharePdf(bytes: bytes, filename: fullFileName);
+        await Printing.sharePdf(bytes: bytes, filename: cleanFileName);
         return InvoiceSaveResult(
           success: true,
-          message: '✓ Opened share sheet for $fullFileName',
+          message: '✓ Opened share sheet for $cleanFileName',
         );
       } catch (shareErr) {
         return InvoiceSaveResult(
           success: false,
-          message: 'Failed to save $fullFileName: $e',
+          message: 'Failed to save $cleanFileName: $e',
         );
       }
     }
