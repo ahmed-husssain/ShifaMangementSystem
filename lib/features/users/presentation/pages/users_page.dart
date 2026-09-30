@@ -70,129 +70,173 @@ class UsersPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Staff Management',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      staffAsync.maybeWhen(
-                        data: (staffList) {
-                          final onlineCount = staffList.where((s) {
-                            final sId = (s['id'] ?? s['uid'] ?? '').toString();
-                            final sEmail = (s['email'] ?? '').toString();
-                            final uName = (s['username'] ?? '').toString();
-                            return presenceState.isOnline(userId: sId, username: uName, email: sEmail);
-                          }).length;
-                          final offlineCount = staffList.length - onlineCount;
-                          return Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFECFDF5),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 6.5,
-                                      height: 6.5,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF10B981),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4.5),
-                                    Text(
-                                      '$onlineCount Online',
-                                      style: const TextStyle(
-                                        color: Color(0xFF047857),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF94A3B8),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4.5),
-                                    Text(
-                                      '$offlineCount Offline',
-                                      style: const TextStyle(
-                                        color: Color(0xFF64748B),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                        orElse: () => const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton.icon(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 480;
+
+                final newUserButton = ElevatedButton.icon(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const RegisterPage(standalone: true)),
                     );
                   },
-                  icon: const Icon(Icons.person_add, size: 18),
-                  label: const Text(
+                  icon: Icon(Icons.person_add, size: isCompact ? 16 : 18),
+                  label: Text(
                     'New User',
                     style: TextStyle(
+                      fontSize: isCompact ? 13 : 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF004B93),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? 12 : 16,
+                      vertical: isCompact ? 8 : 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    elevation: 1,
                   ),
-                ),
-              ],
+                );
+
+                final badges = staffAsync.maybeWhen(
+                  data: (staffList) {
+                    final onlineCount = staffList.where((s) {
+                      final sId = (s['id'] ?? s['uid'] ?? '').toString();
+                      final sEmail = (s['email'] ?? '').toString();
+                      final uName = (s['username'] ?? '').toString();
+                      return presenceState.isOnline(userId: sId, username: uName, email: sEmail);
+                    }).length;
+                    final offlineCount = staffList.length - onlineCount;
+                    return Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6.5,
+                                height: 6.5,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4.5),
+                              Text(
+                                '$onlineCount Online',
+                                style: const TextStyle(
+                                  color: Color(0xFF047857),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF94A3B8),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4.5),
+                              Text(
+                                '$offlineCount Offline',
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  orElse: () => const SizedBox.shrink(),
+                );
+
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Staff Management',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          newUserButton,
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      badges,
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Staff Management',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          badges,
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    newUserButton,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -383,174 +427,156 @@ class UsersPage extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
-                              ListTile(
-                                leading: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundColor: isCurrentAdmin
-                                          ? const Color(0xFF004B93)
-                                          : (isActive ? const Color(0xFFE0F2FE) : Colors.orange.shade100),
-                                      child: Icon(
-                                        isCurrentAdmin
-                                            ? Icons.admin_panel_settings
-                                            : (isActive ? Icons.person : Icons.person_off),
-                                        color: isCurrentAdmin
-                                            ? Colors.white
-                                            : (isActive ? const Color(0xFF004B93) : Colors.orange.shade700),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: isUserOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.white,
-                                            width: 2,
-                                          ),
-                                          boxShadow: isUserOnline
-                                              ? [
-                                                  BoxShadow(
-                                                    color: const Color(0xFF10B981).withValues(alpha: 0.5),
-                                                    blurRadius: 3,
-                                                    spreadRadius: 1,
-                                                  ),
-                                                ]
-                                              : null,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                title: Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        s['name'] ?? 'Unknown',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: isDeactivated ? Colors.grey.shade600 : null,
-                                          decoration: isDeactivated ? TextDecoration.lineThrough : null,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (isCurrentAdmin) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF004B93),
-                                          borderRadius: BorderRadius.circular(5),
-                                        ),
-                                        child: const Text(
-                                          'YOU',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                    const SizedBox(width: 6),
-                                    if (isUserOnline)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFECFDF5),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFFA7F3D0)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              width: 5.5,
-                                              height: 5.5,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFF10B981),
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 3.5),
-                                            const Text(
-                                              'Online',
-                                              style: TextStyle(
-                                                color: Color(0xFF047857),
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    else
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              width: 5,
-                                              height: 5,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFF94A3B8),
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 3.5),
-                                            const Text(
-                                              'Offline',
-                                              style: TextStyle(
-                                                color: Color(0xFF64748B),
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                subtitle: Text('Role: ${s['role'] == 'admin' ? 'Admin' : 'User'} • Username: ${s['username']}'),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(12),
                                 onTap: () => _showUserDetails(context, s),
-                                trailing: FittedBox(
-                                  fit: BoxFit.scaleDown,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                   child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        isActive ? 'Active' : 'Deactivated',
-                                        style: TextStyle(
-                                          color: isActive ? Colors.green : Colors.orange.shade700,
-                                          fontWeight: FontWeight.bold,
+                                      Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          CircleAvatar(
+                                            backgroundColor: isCurrentAdmin
+                                                ? const Color(0xFF004B93)
+                                                : (isActive ? const Color(0xFFE0F2FE) : Colors.orange.shade100),
+                                            child: Icon(
+                                              isCurrentAdmin
+                                                  ? Icons.admin_panel_settings
+                                                  : (isActive ? Icons.person : Icons.person_off),
+                                              color: isCurrentAdmin
+                                                  ? Colors.white
+                                                  : (isActive ? const Color(0xFF004B93) : Colors.orange.shade700),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            bottom: 0,
+                                            right: 0,
+                                            child: Container(
+                                              width: 12,
+                                              height: 12,
+                                              decoration: BoxDecoration(
+                                                color: isUserOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: Colors.white,
+                                                  width: 2,
+                                                ),
+                                                boxShadow: isUserOnline
+                                                    ? [
+                                                        BoxShadow(
+                                                          color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                                                          blurRadius: 3,
+                                                          spreadRadius: 1,
+                                                        ),
+                                                      ]
+                                                    : null,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    s['name'] ?? 'Unknown',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 15.5,
+                                                      color: isDeactivated ? Colors.grey.shade600 : const Color(0xFF1E293B),
+                                                      decoration: isDeactivated ? TextDecoration.lineThrough : null,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (isCurrentAdmin) ...[
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF004B93),
+                                                      borderRadius: BorderRadius.circular(5),
+                                                    ),
+                                                    child: const Text(
+                                                      'YOU',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              'Role: ${s['role'] == 'admin' ? 'Admin' : 'User'}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade700,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 1),
+                                            Text(
+                                              'Username: ${s['username']}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      if (isCurrentAdmin)
-                                        const Tooltip(
-                                          message: 'Active admin session',
-                                          child: Padding(
-                                            padding: EdgeInsets.symmetric(horizontal: 10.0),
-                                            child: Icon(Icons.verified_user, size: 22, color: Color(0xFF004B93)),
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          _buildStatusBadge(isUserOnline),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                isActive ? 'Active' : 'Disabled',
+                                                style: TextStyle(
+                                                  color: isActive ? Colors.green.shade700 : Colors.orange.shade700,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              if (isCurrentAdmin)
+                                                const Tooltip(
+                                                  message: 'Active admin session',
+                                                  child: Padding(
+                                                    padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                                    child: Icon(Icons.verified_user, size: 20, color: Color(0xFF004B93)),
+                                                  ),
+                                                )
+                                              else
+                                                _DeactivationSwitch(
+                                                  isActive: isActive,
+                                                  userUid: s['uid'],
+                                                ),
+                                            ],
                                           ),
-                                        )
-                                      else
-                                        _DeactivationSwitch(
-                                          isActive: isActive,
-                                          userUid: s['uid'],
-                                        ),
+                                        ],
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -579,6 +605,41 @@ class UsersPage extends ConsumerWidget {
       builder: (ctx) {
         return _UserDetailsModal(user: user);
       },
+    );
+  }
+
+  Widget _buildStatusBadge(bool isOnline) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isOnline ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isOnline ? const Color(0xFFA7F3D0) : const Color(0xFFCBD5E1),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: isOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 3.5),
+          Text(
+            isOnline ? 'Online' : 'Offline',
+            style: TextStyle(
+              color: isOnline ? const Color(0xFF047857) : const Color(0xFF64748B),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

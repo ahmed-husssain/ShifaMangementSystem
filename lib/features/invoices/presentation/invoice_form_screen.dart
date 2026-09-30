@@ -20,6 +20,7 @@ import 'widgets/components/invoice_bank_details_section.dart';
 import 'widgets/components/invoice_totals_summary.dart';
 import 'widgets/components/invoice_policy_notice.dart';
 import 'widgets/components/invoice_action_buttons.dart';
+import 'widgets/patient_picker_modal.dart';
 
 const Map<String, double> SERVICE_PRICES = {
   "SELECT SERVICE": 0,
@@ -218,75 +219,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     }
   }
 
-  void _selectPatientFromList() {
-    final profile = ref.read(userProfileProvider).value;
-    final role = profile?['role'] ?? 'staff';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return Consumer(
-          builder: (context, ref, _) {
-            final patientsAsync = role == 'admin'
-                ? ref.watch(allPatientsProvider(false))
-                : ref.watch(staffPatientsProvider);
-
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.7,
-              maxChildSize: 0.9,
-              builder: (_, scrollController) {
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        role == 'admin' ? 'Select Patient' : 'Select My Patient',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: patientsAsync.when(
-                          data: (patients) {
-                            final activePatients = patients.where((p) => !p.isDiscontinued).toList();
-                            if (activePatients.isEmpty) {
-                              return const Center(child: Text('No registered active patients found.'));
-                            }
-                            return ListView.separated(
-                              controller: scrollController,
-                              itemCount: activePatients.length,
-                              separatorBuilder: (context, index) => const Divider(),
-                              itemBuilder: (context, index) {
-                                final p = activePatients[index];
-                                return ListTile(
-                                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                                  title: Text(p.patientName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text('MR: ${p.mrNumber} • CNIC: ${p.cnic}'),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _populatePatientData(p);
-                                  },
-                                );
-                              },
-                            );
-                          },
-                          loading: () => const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(child: Text('Error: $e')),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
+  Future<void> _selectPatientFromList() async {
+    final patient = await PatientPickerModal.show(context);
+    if (patient != null && mounted) {
+      _populatePatientData(patient);
+    }
   }
 
   int _calculateDaysBetween(DateTime from, DateTime to) {
@@ -397,6 +334,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   double get _grandTotal => _subtotal - _discount;
 
   Future<void> _submit(String format) async {
+    if (_isLoading) return;
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please add at least one item')),

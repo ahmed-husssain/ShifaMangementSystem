@@ -3,18 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../domain/editable_service_item.dart';
 import '../../domain/invoice_constants.dart';
+import 'components/editable_service_card.dart';
 
 class InvoiceDetailsEditContent extends StatelessWidget {
   static const int _maxServices = 10;
-
-  void _selectStandardServiceFor(EditableServiceItem item, String selectedService) {
-    item.nameController.text = selectedService == 'Custom Service' ? '' : selectedService;
-    if (InvoiceConstants.standardPrices.containsKey(selectedService)) {
-      item.priceController.text = InvoiceConstants.standardPrices[selectedService]!.toStringAsFixed(0);
-    }
-    item.isNewlyAdded = false;
-    onStateChanged();
-  }
 
   final GlobalKey<FormState> formKey;
   final TextEditingController invoiceNumberController;
@@ -51,9 +43,50 @@ class InvoiceDetailsEditContent extends StatelessWidget {
     required this.onStateChanged,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return _buildEditForm(isNarrow);
+  void _selectStandardServiceFor(EditableServiceItem item, String selectedService) {
+    item.nameController.text = selectedService == 'Custom Service' ? '' : selectedService;
+    if (InvoiceConstants.standardPrices.containsKey(selectedService)) {
+      item.priceController.text = InvoiceConstants.standardPrices[selectedService]!.toStringAsFixed(0);
+    }
+    item.isNewlyAdded = false;
+    onStateChanged();
+  }
+
+  InputDecoration _buildInputDecoration({
+    String? hintText,
+    String? prefixText,
+    bool isNarrow = false,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      prefixText: prefixText,
+      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontSize: 13),
+      hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 8 : 12,
+        vertical: isNarrow ? 8 : 10,
+      ),
+      isDense: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFEF4444)),
+      ),
+      errorStyle: const TextStyle(fontSize: 10.5, height: 1.1),
+    );
   }
 
   Widget _buildSectionHeader({required IconData icon, required String title}) {
@@ -119,10 +152,7 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                 maxLines: 1,
               ),
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 6),
-              trailing,
-            ],
+            ?trailing,
           ],
         ),
         const SizedBox(height: 5),
@@ -131,54 +161,8 @@ class InvoiceDetailsEditContent extends StatelessWidget {
     );
   }
 
-  InputDecoration _buildInputDecoration({
-    String? hintText,
-    String? prefixText,
-    Widget? suffixIcon,
-    bool readOnly = false,
-    bool isNarrow = false,
-  }) {
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: isNarrow ? 12 : 13),
-      prefixText: prefixText,
-      prefixStyle: TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: isNarrow ? 12 : 13,
-        color: const Color(0xFF1E293B),
-      ),
-      suffixIcon: suffixIcon,
-      isDense: true,
-      contentPadding: EdgeInsets.symmetric(
-        horizontal: isNarrow ? 9 : 12,
-        vertical: isNarrow ? 9 : 11,
-      ),
-      filled: true,
-      fillColor: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFEF4444)),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
-      ),
-    );
-  }
-
-  Widget _buildEditForm(bool isNarrow) {
+  @override
+  Widget build(BuildContext context) {
     final formatter = NumberFormat('#,###');
 
     return Form(
@@ -186,165 +170,98 @@ class InvoiceDetailsEditContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ─── Section 1: Patient Information ───
+          // ─── Section 1: Patient Details ───
           _buildSectionHeader(
             icon: Icons.person_outline_rounded,
             title: 'Patient Information',
           ),
           Container(
-            padding: EdgeInsets.all(isNarrow ? 11 : 14),
+            padding: EdgeInsets.all(isNarrow ? 10 : 14),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (!isNarrow) ...[
+                _buildField(
+                  label: 'Patient Name',
+                  required: true,
+                  child: TextFormField(
+                    controller: patientNameController,
+                    decoration: _buildInputDecoration(hintText: 'Enter patient name', isNarrow: isNarrow),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Patient name is required' : null,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (!isNarrow)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        flex: 4,
-                        child: _buildField(
-                          label: 'Patient Name',
-                          required: true,
-                          child: TextFormField(
-                            controller: patientNameController,
-                            decoration: _buildInputDecoration(hintText: 'Enter patient full name'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 3,
                         child: _buildField(
                           label: 'Phone Number',
                           required: true,
                           child: TextFormField(
                             controller: patientPhoneController,
-                            decoration: _buildInputDecoration(hintText: '03001234567'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            keyboardType: TextInputType.phone,
+                            decoration: _buildInputDecoration(hintText: '0300-1234567'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Phone is required' : null,
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        flex: 2,
                         child: _buildField(
-                          label: 'Invoice Number',
+                          label: 'Address',
+                          required: true,
                           child: TextFormField(
-                            controller: invoiceNumberController,
-                            readOnly: true,
-                            decoration: _buildInputDecoration(readOnly: true),
+                            controller: patientAddressController,
+                            decoration: _buildInputDecoration(hintText: 'City / Residential area'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Address is required' : null,
                           ),
                         ),
                       ),
                     ],
-                  ),
-                ] else ...[
+                  )
+                else ...[
                   _buildField(
-                    label: 'Patient Name',
+                    label: 'Phone Number',
                     required: true,
                     child: TextFormField(
-                      controller: patientNameController,
-                      decoration: _buildInputDecoration(hintText: 'Enter patient full name', isNarrow: isNarrow),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      controller: patientPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _buildInputDecoration(hintText: '0300-1234567', isNarrow: isNarrow),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Phone is required' : null,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: _buildField(
-                          label: 'Phone Number',
-                          required: true,
-                          child: TextFormField(
-                            controller: patientPhoneController,
-                            decoration: _buildInputDecoration(hintText: '03001234567', isNarrow: isNarrow),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: _buildField(
-                          label: 'Invoice #',
-                          child: TextFormField(
-                            controller: invoiceNumberController,
-                            readOnly: true,
-                            decoration: _buildInputDecoration(readOnly: true, isNarrow: isNarrow),
-                          ),
-                        ),
-                      ),
-                    ],
+                  _buildField(
+                    label: 'Address',
+                    required: true,
+                    child: TextFormField(
+                      controller: patientAddressController,
+                      decoration: _buildInputDecoration(hintText: 'City / Residential area', isNarrow: isNarrow),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Address is required' : null,
+                    ),
                   ),
                 ],
-                const SizedBox(height: 10),
-                _buildField(
-                  label: 'Address',
-                  required: true,
-                  child: TextFormField(
-                    controller: patientAddressController,
-                    maxLines: 2,
-                    decoration: _buildInputDecoration(hintText: 'Enter complete home address', isNarrow: isNarrow),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // ─── Section 2: Services & Care Plan ───
+          // ─── Section 2: Services Rendered ───
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    const Icon(Icons.medical_services_outlined, size: 17, color: Color(0xFF1565C0)),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        isNarrow ? 'Services' : 'Services & Care Plan',
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: Color(0xFF1565C0),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Text(
-                        '${editableServices.length}/$_maxServices',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              _buildSectionHeader(
+                icon: Icons.medical_services_outlined,
+                title: 'Services Rendered (${editableServices.length}/$_maxServices)',
               ),
-              const SizedBox(width: 8),
               FilledButton.icon(
-                onPressed: editableServices.length < _maxServices ? onAddService : null,
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
+                onPressed: editableServices.length >= _maxServices ? null : onAddService,
+                icon: Icon(Icons.add_rounded, size: isNarrow ? 14 : 16),
                 label: Text(
                   isNarrow ? 'Add' : 'Add Service',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
@@ -367,16 +284,19 @@ class InvoiceDetailsEditContent extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // Service Items List
+          // Service Items List using EditableServiceCard
           ...editableServices.asMap().entries.map((entry) {
             final idx = entry.key;
             final item = entry.value;
 
-            return _buildServiceItemCard(
+            return EditableServiceCard(
               item: item,
               index: idx,
+              totalCount: editableServices.length,
               isNarrow: isNarrow,
               formatter: formatter,
+              onRemove: () => onRemoveService(idx),
+              onSelectStandardService: _selectStandardServiceFor,
             );
           }),
 
@@ -387,11 +307,10 @@ class InvoiceDetailsEditContent extends StatelessWidget {
             icon: Icons.payments_outlined,
             title: 'Financial Breakdown & Payment',
           ),
-          if (!isNarrow) ...[
+          if (!isNarrow)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left column: Payment Status & Note
                 Expanded(
                   flex: 5,
                   child: Container(
@@ -454,15 +373,14 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: const Color(0xFFE2E8F0)),
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: const Row(
                             children: [
-                              const Icon(Icons.sync_rounded, size: 16, color: Color(0xFF2563EB)),
-                              const SizedBox(width: 8),
+                              Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Saving automatically recalculates and syncs Total Revenue & Net Profit across Dashboard and Finances.',
-                                  style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade700, height: 1.3),
+                                  'Financial metrics across analytics, finance reports, and patient ledger will automatically update upon saving.',
+                                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                                 ),
                               ),
                             ],
@@ -473,17 +391,15 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 14),
-                // Right column: Financial Totals Card
                 Expanded(
                   flex: 5,
-                  child: _buildFinancialSummaryCard(formatter, isNarrow: isNarrow),
+                  child: _buildFinancialSummaryCard(formatter, isNarrow: false),
                 ),
               ],
-            ),
-          ] else ...[
-            // Narrow mobile layout: Stacked Payment & Totals
+            )
+          else ...[
             Container(
-              padding: const EdgeInsets.all(11),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
@@ -493,7 +409,7 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                 label: 'Payment Status',
                 child: DropdownButtonFormField<String>(
                   initialValue: paymentStatus,
-                  decoration: _buildInputDecoration(isNarrow: isNarrow),
+                  decoration: _buildInputDecoration(isNarrow: true),
                   items: const [
                     DropdownMenuItem(
                       value: 'Paid',
@@ -516,325 +432,6 @@ class InvoiceDetailsEditContent extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _buildFinancialSummaryCard(formatter, isNarrow: isNarrow),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServiceItemCard({
-    required EditableServiceItem item,
-    required int index,
-    required bool isNarrow,
-    required NumberFormat formatter,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: item.isNewlyAdded ? const Color(0xFF3B82F6) : const Color(0xFFCBD5E1),
-          width: item.isNewlyAdded ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: item.isNewlyAdded ? const Color(0x1A3B82F6) : const Color(0x06000000),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(isNarrow ? 10 : 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Card Header: Badge & Delete Action
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: Text(
-                      'Service #${index + 1}',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1D4ED8),
-                      ),
-                    ),
-                  ),
-                  if (item.isNewlyAdded) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'NEW',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              if (editableServices.length > 1)
-                InkWell(
-                  onTap: () => onRemoveService(index),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.delete_outline_rounded, size: 15, color: Colors.red.shade700),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Remove',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                Text(
-                  isNarrow ? 'Primary (Req)' : 'Primary Service (Required)',
-                  style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Colors.grey.shade500),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Service Name field with Quick Select Standard dropdown
-          _buildField(
-            label: isNarrow ? 'Service Name' : 'Service Name / Care Description',
-            required: true,
-            trailing: PopupMenuButton<String>(
-              tooltip: 'Choose standard service',
-              onSelected: (selected) {
-                _selectStandardServiceFor(item, selected);
-              },
-              itemBuilder: (context) => InvoiceConstants.standardServices.map((serviceName) {
-                final price = InvoiceConstants.standardPrices[serviceName];
-                final priceStr = (price != null && price > 0)
-                    ? ' (Rs. ${formatter.format(price.toInt())})'
-                    : '';
-                return PopupMenuItem<String>(
-                  value: serviceName,
-                  child: Text('$serviceName$priceStr', style: const TextStyle(fontSize: 12.5)),
-                );
-              }).toList(),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isNarrow ? 6 : 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.list_alt_rounded, size: 13, color: Color(0xFF1565C0)),
-                    const SizedBox(width: 3),
-                    Text(
-                      isNarrow ? 'Standard ▾' : 'Standard List ▾',
-                      style: TextStyle(
-                        fontSize: isNarrow ? 10.5 : 11,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1565C0),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            child: TextFormField(
-              controller: item.nameController,
-              decoration: _buildInputDecoration(
-                hintText: 'e.g. Home Nursing Care Services',
-                isNarrow: isNarrow,
-              ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Service name is required' : null,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Pricing, Days, and Line Total
-          if (!isNarrow) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Rate
-                Expanded(
-                  flex: 4,
-                  child: _buildField(
-                    label: 'Rate / Day (PKR)',
-                    required: true,
-                    child: TextFormField(
-                      controller: item.priceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                      decoration: _buildInputDecoration(
-                        hintText: '0',
-                        prefixText: 'Rs. ',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        if (double.tryParse(v.trim()) == null) return 'Invalid';
-                        return null;
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Days
-                Expanded(
-                  flex: 3,
-                  child: _buildField(
-                    label: 'Days / Qty',
-                    required: true,
-                    child: TextFormField(
-                      controller: item.daysController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: _buildInputDecoration(
-                        hintText: '1',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        final n = int.tryParse(v.trim());
-                        if (n == null || n <= 0) return '> 0';
-                        return null;
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Line Total
-                Expanded(
-                  flex: 4,
-                  child: _buildField(
-                    label: 'Line Total',
-                    child: Container(
-                      height: 42,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'Rs. ${formatter.format(item.total.toInt())}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E40AF),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            // Narrow mobile layout: Rate & Days side-by-side, followed by Line Total card
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _buildField(
-                    label: 'Rate / Day',
-                    required: true,
-                    child: TextFormField(
-                      controller: item.priceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                      decoration: _buildInputDecoration(
-                        hintText: '0',
-                        prefixText: 'Rs. ',
-                        isNarrow: isNarrow,
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        if (double.tryParse(v.trim()) == null) return 'Invalid';
-                        return null;
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: _buildField(
-                    label: 'Days / Qty',
-                    required: true,
-                    child: TextFormField(
-                      controller: item.daysController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: _buildInputDecoration(
-                        hintText: '1',
-                        isNarrow: isNarrow,
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        final n = int.tryParse(v.trim());
-                        if (n == null || n <= 0) return '> 0';
-                        return null;
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Line Total:',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E40AF)),
-                  ),
-                  Text(
-                    'Rs. ${formatter.format(item.total.toInt())}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E40AF),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ],
       ),
@@ -864,7 +461,7 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                 ),
               ),
               Text(
-                'Rs. ${formatter.format(subtotal.toInt())}',
+                'Rs. ',
                 style: TextStyle(
                   fontSize: isNarrow ? 13 : 14,
                   fontWeight: FontWeight.bold,
@@ -929,7 +526,7 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Rs. ${formatter.format(grandTotal.toInt())}',
+                  'Rs. ',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -943,6 +540,4 @@ class InvoiceDetailsEditContent extends StatelessWidget {
       ),
     );
   }
-
-
 }

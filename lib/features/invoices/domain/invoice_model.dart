@@ -187,7 +187,6 @@ class Invoice {
       'organization_id': organizationId,
       'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),
-      'updated_by': updatedBy,
       'updated_at': updatedAt.toIso8601String(),
       'is_deleted': isDeleted,
       'deleted_at': deletedAt?.toIso8601String(),

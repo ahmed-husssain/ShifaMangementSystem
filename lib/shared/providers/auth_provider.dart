@@ -140,8 +140,11 @@ bool matchesStaffIdentifier(String? value, Set<String> staffIdentifiers) {
   final cleanVal = value.trim().toLowerCase();
   if (cleanVal.isEmpty || isGenericStaffIdentifier(cleanVal)) return false;
 
-  // Direct exact match
+  // Direct exact match (case-insensitive)
   if (staffIdentifiers.contains(cleanVal)) return true;
+  for (final id in staffIdentifiers) {
+    if (id.trim().toLowerCase() == cleanVal) return true;
+  }
 
   // If cleanVal is an email (e.g. "ali@internal.shifa.app"), check its prefix ("ali")
   if (cleanVal.contains('@')) {
