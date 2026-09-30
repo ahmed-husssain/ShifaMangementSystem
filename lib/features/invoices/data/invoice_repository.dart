@@ -70,14 +70,17 @@ class InvoiceRepository {
         .order('created_at', ascending: false)
         .limit(limit)
         .map((rows) {
-          final list = rows
-              .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
-              .where((inv) {
-                if (inv.isDiscontinued) return false;
-                if (!includeDeleted && inv.isDeleted) return false;
-                return true;
-              })
-              .toList();
+          final seenIds = <String>{};
+          final list = <Invoice>[];
+          for (final doc in rows) {
+            final inv = Invoice.fromMap(doc, (doc['id'] ?? '').toString());
+            if (inv.isDiscontinued) continue;
+            if (!includeDeleted && inv.isDeleted) continue;
+            final key = inv.invoiceId.isNotEmpty ? inv.invoiceId : inv.invoiceNumber;
+            if (seenIds.add(key)) {
+              list.add(inv);
+            }
+          }
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
         });
@@ -225,13 +228,20 @@ final staffInvoicesProvider = StreamProvider<List<Invoice>>((ref) {
         return Stream.value(<Invoice>[]);
       }
 
-      final list = allInvoices.where((inv) {
-        if (inv.isDeleted || inv.isDiscontinued) return false;
-        return matchesStaffInvoice(inv, staffPatientIds, staffIdentifiers: staffIdentifiers);
-      }).toList();
+      final seenIds = <String>{};
+      final uniqueList = <Invoice>[];
+      for (final inv in allInvoices) {
+        if (inv.isDeleted || inv.isDiscontinued) continue;
+        if (matchesStaffInvoice(inv, staffPatientIds, staffIdentifiers: staffIdentifiers)) {
+          final key = inv.invoiceId.isNotEmpty ? inv.invoiceId : inv.invoiceNumber;
+          if (seenIds.add(key)) {
+            uniqueList.add(inv);
+          }
+        }
+      }
 
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return Stream.value(list);
+      uniqueList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return Stream.value(uniqueList);
     },
     loading: () => const Stream.empty(),
     error: (e, st) => Stream.error(e, st),

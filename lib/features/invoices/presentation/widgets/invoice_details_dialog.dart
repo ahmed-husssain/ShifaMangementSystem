@@ -10,6 +10,7 @@ import '../../../patients/domain/patient_model.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import 'invoice_details_view_content.dart';
 import 'invoice_details_edit_content.dart';
+import '../../utils/staff_info_resolver.dart';
 
 class InvoiceDetailsDialog extends ConsumerStatefulWidget {
   final Invoice invoice;
@@ -148,128 +149,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     });
   }
 
-  String _formatStaffName(String raw) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return 'Staff';
-    final isAlnumId = RegExp(r'^[a-zA-Z0-9_-]{20,}$').hasMatch(trimmed);
-    if (isAlnumId) return 'Staff';
-    return trimmed.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      if (word.length == 1) return word.toUpperCase();
-      return word[0].toUpperCase() + word.substring(1);
-    }).join(' ');
-  }
-
   Future<void> _loadCreatorInfo() async {
-    // 1. Direct createdByName from invoice
-    if (widget.invoice.createdByName != null && widget.invoice.createdByName!.trim().isNotEmpty) {
-      final name = widget.invoice.createdByName!.trim();
-      final isAlnumId = RegExp(r'^[a-zA-Z0-9_-]{20,}$').hasMatch(name);
-      if (!isAlnumId && !isGenericStaffIdentifier(name)) {
-        if (mounted) {
-          setState(() {
-            _creatorName = _formatStaffName(name);
-            _creatorRole = widget.invoice.createdByRole ?? 'Staff';
-          });
-        }
-        return;
-      }
-    }
-
-    final creatorUid = widget.invoice.createdByUid ?? 
-                       (widget.invoice.createdBy.isNotEmpty ? widget.invoice.createdBy : widget.invoice.staffId);
-
-    // 2. Query users table if creatorUid is present
-    if (creatorUid.isNotEmpty) {
-      final isUuid = RegExp(
-        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-      ).hasMatch(creatorUid);
-      if (isUuid) {
-        try {
-          final doc = await Supabase.instance.client.from('users').select().eq('id', creatorUid).maybeSingle();
-          if (doc != null && mounted) {
-            final name = doc['name'] ?? doc['username'] ?? doc['email']?.toString().split('@').first;
-            if (name != null && name.toString().trim().isNotEmpty && !isGenericStaffIdentifier(name.toString())) {
-              setState(() {
-                _creatorName = _formatStaffName(name.toString().trim());
-                _creatorRole = doc['role'] ?? 'Staff';
-              });
-              return;
-            }
-          }
-        } catch (_) {}
-      } else {
-        try {
-          final doc = await Supabase.instance.client.from('users').select()
-              .or('username.ilike.$creatorUid,email.ilike.$creatorUid')
-              .limit(1)
-              .maybeSingle();
-          if (doc != null && mounted) {
-            final name = doc['name'] ?? doc['username'] ?? doc['email']?.toString().split('@').first;
-            if (name != null && name.toString().trim().isNotEmpty && !isGenericStaffIdentifier(name.toString())) {
-              setState(() {
-                _creatorName = _formatStaffName(name.toString().trim());
-                _creatorRole = doc['role'] ?? 'Staff';
-              });
-              return;
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    // 3. Query activities table
-    try {
-      final act = await Supabase.instance.client
-          .from('activities')
-          .select('user_name')
-          .eq('entity_id', widget.invoice.invoiceId)
-          .not('user_name', 'is', null)
-          .order('timestamp', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      if (act != null && act['user_name'] != null && mounted) {
-        final actName = act['user_name'].toString().trim();
-        if (actName.isNotEmpty && !isGenericStaffIdentifier(actName)) {
-          setState(() {
-            _creatorName = _formatStaffName(actName);
-            _creatorRole = 'Staff';
-          });
-          return;
-        }
-      }
-    } catch (_) {}
-
-    // 4. Clinical fields from patient if available
-    if (_patient != null) {
-      if (_patient!.nurse.trim().isNotEmpty &&
-          _patient!.nurse.trim().toUpperCase() != 'N/A' &&
-          _patient!.nurse.trim().toLowerCase() != 'none') {
-        if (mounted) {
-          setState(() {
-            _creatorName = _formatStaffName(_patient!.nurse);
-            _creatorRole = 'Staff';
-          });
-        }
-        return;
-      }
-      if (_patient!.doctor.trim().isNotEmpty &&
-          _patient!.doctor.trim().toUpperCase() != 'N/A' &&
-          _patient!.doctor.trim().toLowerCase() != 'none') {
-        if (mounted) {
-          setState(() {
-            _creatorName = _formatStaffName(_patient!.doctor);
-            _creatorRole = 'Doctor';
-          });
-        }
-        return;
-      }
-    }
-
+    final info = await StaffInfoResolver.resolve(
+      invoice: widget.invoice,
+      patient: _patient,
+    );
     if (mounted) {
       setState(() {
-        _creatorName = 'Staff';
-        _creatorRole = 'Staff';
+        _creatorName = info.name;
+        _creatorRole = info.role;
       });
     }
   }
@@ -319,6 +207,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   }
 
   Future<void> _saveChanges() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
     if (_editableServices.isEmpty) {
