@@ -34,6 +34,83 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
     }
   }
 
+  Future<void> _launchCall(String phone) async {
+    final clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (clean.isEmpty) return;
+    try {
+      final uri = Uri.parse('tel:$clean');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not place call: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDone(ExpiringPatientPlan item) async {
+    final name = item.patient.patientName;
+    if (item.scheduledNotification != null) {
+      try {
+        await ref
+            .read(scheduledNotificationRepositoryProvider)
+            .markAsCompleted(item.patient.patientId, item.scheduledNotification!.id);
+      } catch (_) {}
+    }
+    ref.read(dismissedNotificationsProvider.notifier).dismiss(item.id);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Plan notification for $name marked as handled!'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'UNDO',
+            textColor: Colors.amberAccent,
+            onPressed: () {
+              ref.read(dismissedNotificationsProvider.notifier).undo(item.id);
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleDelete(ExpiringPatientPlan item) async {
+    final name = item.patient.patientName;
+    if (item.scheduledNotification != null) {
+      try {
+        await ref
+            .read(scheduledNotificationRepositoryProvider)
+            .deleteScheduledNotification(item.patient.patientId, item.scheduledNotification!.id);
+      } catch (_) {}
+    }
+    ref.read(dismissedNotificationsProvider.notifier).dismiss(item.id);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Dismissed notification for $name'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'UNDO',
+            textColor: Colors.amberAccent,
+            onPressed: () {
+              ref.read(dismissedNotificationsProvider.notifier).undo(item.id);
+            },
+          ),
+        ),
+      );
+    }
+  }
+
   void _openScheduleModal() {
     showModalBottomSheet(
       context: context,
@@ -205,7 +282,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                               : ListView.separated(
                                   controller: scrollController,
                                   itemCount: filteredPlans.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                                   itemBuilder: (context, index) {
                                     final item = filteredPlans[index];
                                     final p = item.patient;
@@ -224,15 +301,16 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                     } else if (item.category == 'expired') {
                                       accentColor = Colors.red.shade700;
                                       bgColor = Colors.red.shade50;
-                                      tagText = 'EXPIRED';
+                                      tagText = item.isFirstInvoice ? 'INITIAL PLAN EXPIRED' : '${item.totalPlanDays}-DAY PLAN EXPIRED';
                                     } else if (item.category == 'today') {
                                       accentColor = Colors.orange.shade800;
                                       bgColor = Colors.amber.shade50;
-                                      tagText = 'EXPIRES IN ${item.hoursRemaining}H';
+                                      tagText = 'EXPIRES TODAY (${item.totalPlanDays}D)';
                                     } else {
                                       accentColor = Colors.teal.shade700;
                                       bgColor = Colors.teal.shade50;
-                                      tagText = 'DUE ON ${DateFormat('MMM d').format(item.expirationDate)}';
+                                      final daysLeft = (item.hoursRemaining / 24).ceil();
+                                      tagText = 'IN $daysLeft DAYS • ${DateFormat("MMM d").format(item.expirationDate)}';
                                     }
 
                                     final careTeam = [
@@ -245,16 +323,16 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: accentColor.withOpacity(0.3)),
+                                        border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1.2),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: accentColor.withOpacity(0.06),
-                                            blurRadius: 8,
+                                            color: accentColor.withValues(alpha: 0.05),
+                                            blurRadius: 10,
                                             offset: const Offset(0, 3),
                                           ),
                                         ],
                                       ),
-                                      padding: const EdgeInsets.all(14.0),
+                                      padding: const EdgeInsets.all(12.0),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -263,10 +341,10 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.all(8),
+                                                padding: const EdgeInsets.all(7),
                                                 decoration: BoxDecoration(
                                                   color: bgColor,
-                                                  shape: BoxShape.circle,
+                                                  borderRadius: BorderRadius.circular(9),
                                                 ),
                                                 child: Icon(
                                                   isScheduled
@@ -277,7 +355,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                                               ? Icons.timer_outlined
                                                               : Icons.calendar_today_rounded)),
                                                   color: accentColor,
-                                                  size: 20,
+                                                  size: 18,
                                                 ),
                                               ),
                                               const SizedBox(width: 10),
@@ -285,44 +363,50 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(
-                                                      item.notificationMessage,
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Color(0xFF0F172A),
-                                                        height: 1.3,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 6),
-                                                    Wrap(
-                                                      spacing: 8,
-                                                      runSpacing: 4,
+                                                    Row(
                                                       children: [
-                                                        Text(
-                                                          'MR: ${p.mrNumber}',
-                                                          style: TextStyle(
-                                                            fontSize: 11,
-                                                            fontWeight: FontWeight.w600,
-                                                            color: Colors.grey.shade600,
+                                                        Expanded(
+                                                          child: Text(
+                                                            p.patientName.trim(),
+                                                            style: const TextStyle(
+                                                              fontSize: 13.5,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: Color(0xFF0F172A),
+                                                              letterSpacing: -0.1,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
                                                           ),
                                                         ),
+                                                        const SizedBox(width: 6),
                                                         Container(
                                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                           decoration: BoxDecoration(
                                                             color: bgColor,
-                                                            borderRadius: BorderRadius.circular(4),
+                                                            borderRadius: BorderRadius.circular(5),
+                                                            border: Border.all(color: accentColor.withValues(alpha: 0.35)),
                                                           ),
                                                           child: Text(
                                                             tagText,
                                                             style: TextStyle(
-                                                              fontSize: 9,
-                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 8.5,
+                                                              fontWeight: FontWeight.w800,
                                                               color: accentColor,
+                                                              letterSpacing: 0.3,
                                                             ),
                                                           ),
                                                         ),
                                                       ],
+                                                    ),
+                                                    const SizedBox(height: 3),
+                                                    Text(
+                                                      item.notificationMessage,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors.blueGrey.shade800,
+                                                        height: 1.25,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -331,64 +415,105 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                           ),
 
                                           // Patient Context & Care Team Details
-                                          if (careTeam.isNotEmpty || p.phone.isNotEmpty) ...[
-                                            const SizedBox(height: 10),
+                                          if (p.phone.isNotEmpty || p.address.isNotEmpty || careTeam.isNotEmpty || p.selectedServices.isNotEmpty) ...[
+                                            const SizedBox(height: 9),
                                             Container(
-                                              padding: const EdgeInsets.all(8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                                               decoration: BoxDecoration(
-                                                color: Colors.grey.shade50,
+                                                color: const Color(0xFFF8FAFC),
                                                 borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: Colors.grey.shade200),
+                                                border: Border.all(color: const Color(0xFFE2E8F0)),
                                               ),
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  if (p.phone.isNotEmpty || p.address.isNotEmpty)
-                                                    Text(
-                                                      [p.phone, p.address].where((s) => s.isNotEmpty).join(' • '),
-                                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.black87),
-                                                    ),
-                                                  if (careTeam.isNotEmpty) ...[
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      careTeam,
-                                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                                                  Row(
+                                                    children: [
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.white,
+                                                          borderRadius: BorderRadius.circular(4),
+                                                          border: Border.all(color: Colors.grey.shade300),
+                                                        ),
+                                                        child: Text(
+                                                          'MR: ${p.mrNumber}',
+                                                          style: TextStyle(
+                                                            fontSize: 9.5,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: Colors.grey.shade800,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (p.phone.isNotEmpty) ...[
+                                                        const SizedBox(width: 8),
+                                                        Icon(Icons.phone_outlined, size: 11, color: Colors.grey.shade600),
+                                                        const SizedBox(width: 3),
+                                                        Text(
+                                                          p.phone,
+                                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                                                        ),
+                                                      ],
+                                                      if (p.selectedServices.isNotEmpty) ...[
+                                                        const SizedBox(width: 8),
+                                                        Expanded(
+                                                          child: Text(
+                                                            '• ${p.selectedServices.map((s) => (s['serviceName'] ?? s['name'] ?? '').toString()).where((s) => s.isNotEmpty).join(', ')}',
+                                                            style: TextStyle(fontSize: 9.5, color: Colors.grey.shade600),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                  if (p.address.isNotEmpty || careTeam.isNotEmpty) ...[
+                                                    const SizedBox(height: 4),
+                                                    Row(
+                                                      children: [
+                                                        if (p.address.isNotEmpty) ...[
+                                                          Icon(Icons.location_on_outlined, size: 11, color: Colors.grey.shade500),
+                                                          const SizedBox(width: 3),
+                                                          Expanded(
+                                                            child: Text(
+                                                              p.address,
+                                                              style: TextStyle(fontSize: 9.5, color: Colors.grey.shade700),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                        if (p.address.isNotEmpty && careTeam.isNotEmpty) const SizedBox(width: 8),
+                                                        if (careTeam.isNotEmpty) ...[
+                                                          Icon(Icons.medical_services_outlined, size: 11, color: Colors.indigo.shade400),
+                                                          const SizedBox(width: 3),
+                                                          Flexible(
+                                                            child: Text(
+                                                              careTeam,
+                                                              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: Colors.indigo.shade700),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
                                                     ),
                                                   ],
                                                 ],
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(height: 12),
+                                          const SizedBox(height: 10),
 
-                                          // Action Buttons: Responsive Wrap Layout
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 8,
+                                          // Action Buttons: Single Unified Executive Row
+                                          Row(
                                             children: [
-                                              // 1-Click WhatsApp Button
-                                              OutlinedButton.icon(
-                                                onPressed: () => _launchWhatsApp(item.whatsappUrl),
-                                                style: OutlinedButton.styleFrom(
-                                                  foregroundColor: const Color(0xFF25D366),
-                                                  side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                ),
-                                                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
-                                                label: const Text(
-                                                  'WhatsApp 📲',
-                                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                                ),
-                                              ),
-                                              // Issue Next Invoice Button (defaults to 15 days or targetDays)
+                                              // Primary Action: Issue Invoice Button
                                               ElevatedButton.icon(
                                                 onPressed: () {
                                                   final daysToUse = isScheduled && item.scheduledNotification != null && item.scheduledNotification!.targetDays > 0
                                                       ? item.scheduledNotification!.targetDays
-                                                      : 15;
+                                                      : (item.totalPlanDays > 0 ? item.totalPlanDays : 30);
                                                   Navigator.pop(context);
                                                   Navigator.push(
                                                     context,
@@ -400,48 +525,122 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: const Color(0xFF1565C0),
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6.5),
+                                                  elevation: 0,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
                                                 ),
-                                                icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                                                label: const Text(
-                                                  'Issue Invoice ➔',
-                                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                icon: const Icon(Icons.receipt_long_rounded, size: 12),
+                                                label: Text(
+                                                  item.isFirstInvoice ? 'First Invoice ➔' : 'Issue Invoice ➔',
+                                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
-                                              // Mark Complete & Delete Buttons (for Scheduled Items)
-                                              if (isScheduled && item.scheduledNotification != null) ...[
-                                                IconButton(
-                                                  tooltip: 'Mark Complete & Dismiss',
-                                                  icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 22),
-                                                  onPressed: () async {
-                                                    await ref
-                                                        .read(scheduledNotificationRepositoryProvider)
-                                                        .markAsCompleted(p.patientId, item.scheduledNotification!.id);
-                                                    if (mounted) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        const SnackBar(content: Text('✓ Scheduled reminder marked as completed!')),
-                                                      );
-                                                    }
-                                                  },
+                                              const SizedBox(width: 5),
+
+                                              // 1-Click WhatsApp Button
+                                              OutlinedButton.icon(
+                                                onPressed: () => _launchWhatsApp(item.whatsappUrl),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: const Color(0xFF128C7E),
+                                                  side: const BorderSide(color: Color(0xFF25D366), width: 1.2),
+                                                  backgroundColor: const Color(0xFFF0FDF4),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6.5),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
                                                 ),
-                                                IconButton(
-                                                  tooltip: 'Delete Notification',
-                                                  icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade600, size: 22),
-                                                  onPressed: () async {
-                                                    await ref
-                                                        .read(scheduledNotificationRepositoryProvider)
-                                                        .deleteScheduledNotification(p.patientId, item.scheduledNotification!.id);
-                                                    if (mounted) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        const SnackBar(content: Text('✓ Scheduled reminder deleted!')),
-                                                      );
-                                                    }
-                                                  },
+                                                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 12, color: Color(0xFF25D366)),
+                                                label: const Text(
+                                                  'WhatsApp',
+                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+
+                                              // Direct Call Button
+                                              if (p.phone.isNotEmpty) ...[
+                                                const SizedBox(width: 5),
+                                                Tooltip(
+                                                  message: 'Direct Call (${p.phone})',
+                                                  child: InkWell(
+                                                    onTap: () => _launchCall(p.phone),
+                                                    borderRadius: BorderRadius.circular(7),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.blue.shade50,
+                                                        borderRadius: BorderRadius.circular(7),
+                                                        border: Border.all(color: Colors.blue.shade200),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.phone_in_talk_rounded, color: Colors.blue.shade700, size: 12),
+                                                          const SizedBox(width: 3),
+                                                          Text(
+                                                            'Call',
+                                                            style: TextStyle(
+                                                              fontSize: 9.5,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: Colors.blue.shade800,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
                                                 ),
                                               ],
+
+                                              const Spacer(),
+
+                                              // Done / Handled Button (for all notifications)
+                                              Tooltip(
+                                                message: 'Mark as Handled / Done',
+                                                child: InkWell(
+                                                  onTap: () => _handleDone(item),
+                                                  borderRadius: BorderRadius.circular(7),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.green.shade50,
+                                                      borderRadius: BorderRadius.circular(7),
+                                                      border: Border.all(color: Colors.green.shade300),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 13),
+                                                        const SizedBox(width: 3),
+                                                        Text(
+                                                          'Done',
+                                                          style: TextStyle(
+                                                            fontSize: 9.5,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Colors.green.shade800,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 5),
+
+                                              // Delete / Dismiss Button (for all notifications)
+                                              Tooltip(
+                                                message: 'Dismiss / Delete Notification',
+                                                child: InkWell(
+                                                  onTap: () => _handleDelete(item),
+                                                  borderRadius: BorderRadius.circular(7),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.all(5.5),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red.shade50,
+                                                      borderRadius: BorderRadius.circular(7),
+                                                      border: Border.all(color: Colors.red.shade200),
+                                                    ),
+                                                    child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade700, size: 13),
+                                                  ),
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ],
