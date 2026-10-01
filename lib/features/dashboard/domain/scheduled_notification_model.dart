@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ScheduledNotification {
   final String id;
   final String patientId;
@@ -39,8 +37,8 @@ class ScheduledNotification {
       'address': address,
       'reminderNote': reminderNote,
       'targetDays': targetDays,
-      'scheduledFor': Timestamp.fromDate(scheduledFor),
-      'createdAt': Timestamp.fromDate(createdAt),
+      'scheduledFor': scheduledFor.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
       'createdBy': createdBy,
       'isCompleted': isCompleted,
     };
@@ -49,7 +47,6 @@ class ScheduledNotification {
   factory ScheduledNotification.fromMap(Map<dynamic, dynamic> map, String docId) {
     DateTime parseDate(dynamic val) {
       if (val == null) return DateTime.now();
-      if (val is Timestamp) return val.toDate();
       if (val is DateTime) return val;
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       if (val is num) return DateTime.fromMillisecondsSinceEpoch(val.toInt());
