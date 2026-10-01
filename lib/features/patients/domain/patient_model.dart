@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../dashboard/domain/scheduled_notification_model.dart';
 
 class Patient {
@@ -71,7 +70,6 @@ class Patient {
   static DateTime? _parseDate(dynamic val) {
     if (val == null) return null;
     if (val is DateTime) return val;
-    if (val is Timestamp) return val.toDate();
     if (val is String) return DateTime.tryParse(val);
     if (val is Map && val.containsKey('_seconds')) {
       return DateTime.fromMillisecondsSinceEpoch((val['_seconds'] as int) * 1000);
