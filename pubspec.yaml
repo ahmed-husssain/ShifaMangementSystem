@@ -35,10 +35,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.3.2
   go_router: ^17.3.0
-  firebase_core: ^4.11.0
-  firebase_auth: ^6.5.4
-  cloud_firestore: ^6.6.0
-  cloud_functions: ^6.3.3
   supabase_flutter: ^2.8.3
   pdf: ^3.13.0
   printing: ^5.15.0

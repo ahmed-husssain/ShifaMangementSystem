@@ -362,7 +362,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
       if (user == null) throw Exception("User not logged in");
 
-      // Auto-create or update Patient in Firestore
+      // Auto-create or update Patient in Supabase
       if (_patient == null) {
         final patientId = DateTime.now().millisecondsSinceEpoch.toString();
         final newPatient = Patient(

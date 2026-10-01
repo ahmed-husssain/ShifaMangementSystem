@@ -38,7 +38,7 @@ final patientCreatorsMapProvider = StreamProvider<Map<String, String>>((ref) {
       });
 });
 
-/// Map of legacy user_id (e.g. Firebase UIDs) -> user_name from activities log
+/// Map of legacy user_id -> user_name from activities log
 final legacyUidToNameProvider = StreamProvider<Map<String, String>>((ref) {
   final supabase = ref.watch(supabaseClientProvider);
   return supabase

@@ -222,7 +222,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     try {
       final repo = ref.read(invoiceRepositoryProvider);
       
-      // 1. Update Patient details in Firestore if loaded
+      // 1. Update Patient details in Supabase if loaded
       if (_patient != null) {
         final updatedPatient = Patient(
           patientId: _patient!.patientId,
@@ -275,7 +275,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
         invoiceDays = updatedItems.map((i) => i.quantity).reduce((a, b) => a > b ? a : b);
       }
 
-      // 3. Update Invoice in Firestore
+      // 3. Update Invoice in Supabase
       final updatedInvoice = Invoice(
         invoiceId: widget.invoice.invoiceId,
         invoiceNumber: _invoiceNumberController.text.trim(),

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class InvoiceItem {
   final String serviceName;
   final double price;
@@ -86,7 +84,6 @@ class Invoice {
 
   factory Invoice.fromMap(Map<String, dynamic> data, String documentId) {
     DateTime? parseDate(dynamic val) {
-      if (val is Timestamp) return val.toDate();
       if (val is DateTime) return val;
       if (val is String) return DateTime.tryParse(val);
       if (val is Map && val.containsKey('_seconds')) {
@@ -165,8 +162,8 @@ class Invoice {
       'deletedBy': deletedBy,
       'paymentStatus': paymentStatus,
       'isDiscontinued': isDiscontinued,
-      'fromDate': fromDate != null ? Timestamp.fromDate(fromDate!) : null,
-      'toDate': toDate != null ? Timestamp.fromDate(toDate!) : null,
+      'fromDate': fromDate?.toIso8601String(),
+      'toDate': toDate?.toIso8601String(),
       'days': days,
       'createdByName': createdByName,
       'createdByRole': createdByRole,

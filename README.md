@@ -4,7 +4,6 @@
 [![Dart](https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![Riverpod](https://img.shields.io/badge/Riverpod-3.x-2B579A?logo=flutter&logoColor=white)](https://riverpod.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Database%20%26%20Realtime-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
-[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%26%20Storage-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](#)
 
 > A high-performance, clinical-grade healthcare operating platform engineered for **Shifa Home Health Care**. Streamlines patient intake, clinical care team coordination, dynamic plan renewal tracking, real-time invoicing, staff payouts, and executive financial reporting.
@@ -97,7 +96,7 @@ Phase 4: Custom Snooze                                            Phase 5: Push 
 | **Language** | [Dart](https://dart.dev) (3.6+) | Core application logic and async streams |
 | **State Management** | [Riverpod](https://riverpod.dev) (3.x) | Reactive dependency injection, Notifiers & StreamProviders |
 | **Database & Realtime** | [Supabase](https://supabase.com) | PostgreSQL database, realtime streams, and scheduled notifications |
-| **Auth & Storage** | [Firebase](https://firebase.google.com) | User authentication, session management, and cloud storage |
+| **Authentication** | [Supabase Auth](https://supabase.com/auth) | JWT authentication, secure session handling, and role metadata |
 | **Documents & Printing**| `pdf` & `printing` | Dynamic vector PDF invoice generation and thermal receipt printing |
 | **Communication** | `url_launcher` | Native WhatsApp URL scheme integration and telephony dialer |
 
