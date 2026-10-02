@@ -141,7 +141,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               final patientId = state.uri.queryParameters['patientId'];
               final defaultDaysStr = state.uri.queryParameters['defaultDays'];
               final defaultDays = defaultDaysStr != null ? int.tryParse(defaultDaysStr) ?? 15 : 15;
-              return InvoiceFormScreen(patientId: patientId, defaultDays: defaultDays);
+              final fromDateStr = state.uri.queryParameters['fromDate'];
+              final initialFromDate = fromDateStr != null ? DateTime.tryParse(fromDateStr) : null;
+              return InvoiceFormScreen(
+                patientId: patientId,
+                defaultDays: defaultDays,
+                initialFromDate: initialFromDate,
+              );
             },
           ),
           GoRoute(
