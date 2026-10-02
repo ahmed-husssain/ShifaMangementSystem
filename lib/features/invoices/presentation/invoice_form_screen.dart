@@ -46,11 +46,13 @@ const Map<String, double> SERVICE_PRICES = {
 class InvoiceFormScreen extends ConsumerStatefulWidget {
   final String? patientId;
   final int defaultDays;
+  final DateTime? initialFromDate;
 
   const InvoiceFormScreen({
     super.key,
     this.patientId,
     this.defaultDays = 15,
+    this.initialFromDate,
   });
 
   @override
@@ -74,21 +76,24 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _cnicController = TextEditingController();
   bool _isSearchingPatient = false;
   String? _searchStatusMessage;
   bool _draftRestored = false;
+  String? _continuityNote;
 
   @override
   void initState() {
     super.initState();
     _days = widget.defaultDays > 0 ? widget.defaultDays : 15;
+    if (widget.initialFromDate != null) {
+      _fromDate = DateTime(widget.initialFromDate!.year, widget.initialFromDate!.month, widget.initialFromDate!.day);
+      _continuityNote = 'Smart Continuity: Billing starts ${DateFormat('MMM d, yyyy').format(_fromDate)}';
+    }
     _toDate = _fromDate.add(Duration(days: _days));
 
     _nameController.addListener(_autoSaveDraft);
     _phoneController.addListener(_autoSaveDraft);
     _addressController.addListener(_autoSaveDraft);
-    _cnicController.addListener(_autoSaveDraft);
     _mrNumberController.addListener(_autoSaveDraft);
 
     if (widget.patientId != null && widget.patientId!.isNotEmpty) {
@@ -110,7 +115,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         if (draft.patientName.isNotEmpty) _nameController.text = draft.patientName;
         if (draft.phone.isNotEmpty) _phoneController.text = draft.phone;
         if (draft.address.isNotEmpty) _addressController.text = draft.address;
-        if (draft.cnic.isNotEmpty) _cnicController.text = draft.cnic;
         _paymentStatus = draft.paymentStatus;
         _days = draft.days;
         _discount = draft.discount;
@@ -143,7 +147,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       _nameController.clear();
       _phoneController.clear();
       _addressController.clear();
-      _cnicController.clear();
       _mrNumberController.clear();
       _items.clear();
       for (final c in _itemDaysControllers) {
@@ -157,6 +160,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       _toDate = _fromDate.add(Duration(days: _days));
       _patient = null;
       _draftRestored = false;
+      _continuityNote = null;
     });
     _generateInvoiceNumber();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -171,7 +175,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       patientName: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim(),
-      cnic: _cnicController.text.trim(),
+      cnic: _patient?.cnic ?? '',
       paymentStatus: _paymentStatus,
       days: _days,
       discount: _discount,
@@ -187,7 +191,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
-    _cnicController.dispose();
     for (final c in _itemDaysControllers) {
       c.dispose();
     }
@@ -235,7 +238,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           .maybeSingle();
       if (doc != null) {
         final p = Patient.fromMap(doc, (doc['id'] ?? '').toString());
-        _populatePatientData(p, defaultDays: widget.defaultDays);
+        await _populatePatientData(
+          p,
+          defaultDays: widget.defaultDays,
+          explicitFromDate: widget.initialFromDate,
+        );
       }
     } catch (e) {
       // Silently fail
@@ -277,7 +284,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
             return;
           }
 
-          _populatePatientData(p);
+          await _populatePatientData(p);
           return;
         }
       }
@@ -297,7 +304,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           return;
         }
 
-        _populatePatientData(p);
+        await _populatePatientData(p);
       } else {
         setState(() {
           _isSearchingPatient = false;
@@ -315,7 +322,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   Future<void> _selectPatientFromList() async {
     final patient = await PatientPickerModal.show(context);
     if (patient != null && mounted) {
-      _populatePatientData(patient);
+      await _populatePatientData(patient);
     }
   }
 
@@ -326,19 +333,79 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     return diff > 0 ? diff : 1;
   }
 
-  void _populatePatientData(Patient p, {int defaultDays = 15}) {
-    final effectiveDays = p.days > 0 ? p.days : defaultDays;
+  Future<void> _populatePatientData(
+    Patient p, {
+    int defaultDays = 15,
+    DateTime? explicitFromDate,
+  }) async {
+    int effectiveDays = p.days > 0 ? p.days : defaultDays;
+    DateTime resolvedFrom = explicitFromDate ?? _fromDate;
+    String? note;
+    List<InvoiceItem>? carriedInvoiceItems;
+
+    // Smart Date Continuity Resolution
+    if (explicitFromDate != null) {
+      resolvedFrom = DateTime(explicitFromDate.year, explicitFromDate.month, explicitFromDate.day);
+      note = 'Smart Continuity: Billing starts ${DateFormat('MMM d, yyyy').format(resolvedFrom)}';
+    } else {
+      // Look up previous invoices for this patient in Supabase to maintain zero-gap date continuity
+      try {
+        final invRows = await Supabase.instance.client
+            .from('invoices')
+            .select()
+            .eq('patient_id', p.patientId)
+            .eq('is_deleted', false)
+            .order('created_at', ascending: false)
+            .limit(10);
+
+        if (invRows.isNotEmpty) {
+          final patientInvoices = invRows.map((r) => Invoice.fromMap(r, (r['id'] ?? '').toString())).toList();
+          patientInvoices.sort((a, b) {
+            final aEnd = a.toDate ?? (a.fromDate != null && a.days > 0 ? a.fromDate!.add(Duration(days: a.days)) : a.createdAt);
+            final bEnd = b.toDate ?? (b.fromDate != null && b.days > 0 ? b.fromDate!.add(Duration(days: b.days)) : b.createdAt);
+            return bEnd.compareTo(aEnd);
+          });
+          final latestInv = patientInvoices.first;
+          final prevEnd = latestInv.toDate ?? (latestInv.fromDate != null && latestInv.days > 0 ? latestInv.fromDate!.add(Duration(days: latestInv.days)) : null);
+          if (prevEnd != null) {
+            // Next invoice starts on the day immediately following previous coverage end (zero-gap)
+            resolvedFrom = DateTime(prevEnd.year, prevEnd.month, prevEnd.day).add(const Duration(days: 1));
+            note = 'Smart Continuity: Starts ${DateFormat('MMM d').format(resolvedFrom)} (following invoice #${latestInv.invoiceNumber} ending ${DateFormat('MMM d').format(prevEnd)} — 0 day gap)';
+          }
+          if (effectiveDays <= 0 && latestInv.days > 0) {
+            effectiveDays = latestInv.days;
+          }
+          if (p.selectedServices.isEmpty && latestInv.items.isNotEmpty) {
+            carriedInvoiceItems = latestInv.items;
+          }
+        } else {
+          // Newly registered patient without prior invoices: Start from registration date
+          resolvedFrom = DateTime(p.createdAt.year, p.createdAt.month, p.createdAt.day);
+          note = 'First Invoice: Starts from enrollment date (${DateFormat('MMM d, yyyy').format(resolvedFrom)})';
+        }
+      } catch (_) {
+        // Fallback to today if query fails
+        resolvedFrom = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+      }
+    }
+
+    final resolvedDays = effectiveDays > 0 ? effectiveDays : 15;
+    final resolvedTo = resolvedFrom.add(Duration(days: resolvedDays));
+
+    if (!mounted) return;
+
     setState(() {
       _patient = p;
       _mrNumberController.text = p.mrNumber;
       _nameController.text = p.patientName;
       _phoneController.text = p.phone;
       _addressController.text = p.address;
-      _cnicController.text = p.cnic;
       _isSearchingPatient = false;
 
-      _days = effectiveDays;
-      _toDate = _fromDate.add(Duration(days: effectiveDays));
+      _days = resolvedDays;
+      _fromDate = resolvedFrom;
+      _toDate = resolvedTo;
+      _continuityNote = note;
 
       // Automatically populate invoice items with patient's registered services
       _items.clear();
@@ -363,32 +430,44 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
             _items.add(InvoiceItem(
               serviceName: sName,
               price: price,
-              quantity: effectiveDays,
+              quantity: resolvedDays,
             ));
-            _itemDaysControllers.add(TextEditingController(text: effectiveDays.toString()));
+            _itemDaysControllers.add(TextEditingController(text: resolvedDays.toString()));
           }
+        }
+      } else if (carriedInvoiceItems != null && carriedInvoiceItems.isNotEmpty) {
+        // Fallback: carry over recurring line items and rates from latest invoice
+        for (final item in carriedInvoiceItems) {
+          _items.add(InvoiceItem(
+            serviceName: item.serviceName,
+            price: item.price,
+            quantity: resolvedDays,
+          ));
+          _itemDaysControllers.add(TextEditingController(text: resolvedDays.toString()));
         }
       }
 
       // If no selectedServices array exists but patientAmount is set, add fallback item
       if (_items.isEmpty && p.patientAmount > 0) {
-        final dailyPrice = (p.patientAmount / effectiveDays).roundToDouble();
+        final dailyPrice = (p.patientAmount / resolvedDays).roundToDouble();
         _items.add(InvoiceItem(
           serviceName: 'Patient Healthcare Service',
           price: dailyPrice > 0 ? dailyPrice : p.patientAmount,
-          quantity: effectiveDays,
+          quantity: resolvedDays,
         ));
-        _itemDaysControllers.add(TextEditingController(text: effectiveDays.toString()));
+        _itemDaysControllers.add(TextEditingController(text: resolvedDays.toString()));
       }
 
       // If still empty, add default blank service row
       if (_items.isEmpty) {
-        _items.add(InvoiceItem(serviceName: '', price: 0, quantity: effectiveDays));
-        _itemDaysControllers.add(TextEditingController(text: effectiveDays.toString()));
+        _items.add(InvoiceItem(serviceName: '', price: 0, quantity: resolvedDays));
+        _itemDaysControllers.add(TextEditingController(text: resolvedDays.toString()));
       }
 
-      _searchStatusMessage = '✓ Loaded patient ${p.patientName} & calculated for $effectiveDays days (${_items.length} service(s))';
+      _searchStatusMessage = '✓ Loaded ${p.patientName} • Aligned: ${DateFormat('dd MMM').format(_fromDate)} - ${DateFormat('dd MMM yyyy').format(_toDate)} ($resolvedDays days)';
     });
+
+    _autoSaveDraft();
   }
 
   void _addItem() {
@@ -467,7 +546,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
               ? 'SHHC-${DateFormat('yyMMdd').format(DateTime.now())}-${(1000 + DateTime.now().millisecond)}'
               : mrNum,
           patientName: name.isEmpty ? 'Patient' : name,
-          cnic: _cnicController.text.trim(),
+          cnic: '',
           phone: phone,
           address: address,
           diagnosis: '',
@@ -498,7 +577,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           patientId: _patient!.patientId,
           mrNumber: mrNum.isNotEmpty ? mrNum : _patient!.mrNumber,
           patientName: name.isNotEmpty ? name : _patient!.patientName,
-          cnic: _cnicController.text.trim().isNotEmpty ? _cnicController.text.trim() : _patient!.cnic,
+          cnic: _patient!.cnic,
           phone: phone.isNotEmpty ? phone : _patient!.phone,
           address: address.isNotEmpty ? address : _patient!.address,
           diagnosis: _patient!.diagnosis,
@@ -747,6 +826,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
         final calculatedDays = _calculateDaysBetween(_fromDate, _toDate);
         _days = calculatedDays;
+        _continuityNote = null;
 
         for (int i = 0; i < _items.length; i++) {
           _items[i] = InvoiceItem(
@@ -759,6 +839,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           c.text = calculatedDays.toString();
         }
       });
+      _autoSaveDraft();
     }
   }
 
@@ -809,6 +890,29 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                       ),
                     ),
                   ],
+                  if (_continuityNote != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFF1D4ED8)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _continuityNote!,
+                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E40AF)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   // ─── Invoice Header Card ───
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -839,7 +943,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                           nameController: _nameController,
                           phoneController: _phoneController,
                           addressController: _addressController,
-                          cnicController: _cnicController,
                           isSearchingPatient: _isSearchingPatient,
                           searchStatusMessage: _searchStatusMessage,
                           onSelectPatientFromDatabase: _selectPatientFromList,

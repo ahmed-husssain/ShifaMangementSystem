@@ -63,32 +63,34 @@ class MainLayout extends ConsumerWidget {
         backgroundColor: Colors.white,
         elevation: 1,
         foregroundColor: Colors.black87,
-        title: Image.asset(
-          'assets/ShifaLogo.jpeg',
-          height: 52,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0056B3),
-                  borderRadius: BorderRadius.circular(8),
+        title: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 150, maxHeight: 42),
+          child: Image.asset(
+            'assets/ShifaLogo.jpeg',
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0056B3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 20),
                 ),
-                child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Shifa',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0056B3),
-                  letterSpacing: 0.5,
+                const SizedBox(width: 8),
+                const Text(
+                  'Shifa',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0056B3),
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [

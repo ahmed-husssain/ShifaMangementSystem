@@ -6,7 +6,6 @@ class InvoicePatientSection extends StatelessWidget {
   final TextEditingController? nameController;
   final TextEditingController? phoneController;
   final TextEditingController? addressController;
-  final TextEditingController? cnicController;
   final bool isSearchingPatient;
   final String? searchStatusMessage;
   final VoidCallback? onSelectPatientFromDatabase;
@@ -25,7 +24,6 @@ class InvoicePatientSection extends StatelessWidget {
     this.nameController,
     this.phoneController,
     this.addressController,
-    this.cnicController,
     this.isSearchingPatient = false,
     this.searchStatusMessage,
     this.onSelectPatientFromDatabase,
@@ -290,34 +288,6 @@ class InvoicePatientSection extends StatelessWidget {
                   ),
                 ],
               ),
-              if (cnicController != null) ...[
-                const SizedBox(height: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CNIC',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1565C0),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TextField(
-                      controller: cnicController,
-                      style: const TextStyle(fontSize: 12),
-                      decoration: InputDecoration(
-                        hintText: 'CNIC (e.g. 42101-xxxxxxx-x)',
-                        hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),

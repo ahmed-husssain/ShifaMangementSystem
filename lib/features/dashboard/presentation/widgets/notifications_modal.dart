@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../shared/providers/plan_expiration_provider.dart';
+import '../../../../core/services/device_notification_service.dart';
 import '../../../invoices/presentation/invoice_form_screen.dart';
 import '../../data/scheduled_notification_repository.dart';
+import '../providers/staff_filter_provider.dart';
 import 'schedule_notification_modal.dart';
+import 'staff_filter_bar.dart';
 
 class NotificationsModal extends ConsumerStatefulWidget {
   const NotificationsModal({super.key});
@@ -16,6 +19,12 @@ class NotificationsModal extends ConsumerStatefulWidget {
 
 class _NotificationsModalState extends ConsumerState<NotificationsModal> {
   String _selectedFilter = 'all'; // 'all', 'expired', 'today', 'upcoming', 'scheduled'
+
+  @override
+  void initState() {
+    super.initState();
+    DeviceNotificationService.instance.initialize();
+  }
 
   Future<void> _launchWhatsApp(String url) async {
     try {
@@ -136,14 +145,14 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
             color: Color(0xFFF8FAFC),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header Drag Handle
               Center(
                 child: Container(
-                  width: 40,
+                  width: 36,
                   height: 4,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
@@ -151,78 +160,127 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // Modal Title & + Schedule Reminder Action
+              // Modal Title & Action Bar (Optimized for Mobile Viewports)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.notifications_active_rounded, color: Color(0xFF1565C0), size: 22),
-                        const SizedBox(width: 8),
-                        const Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'PLAN NOTIFICATIONS',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                  const Icon(Icons.notifications_active_rounded, color: Color(0xFF1565C0), size: 20),
+                  const SizedBox(width: 7),
+                  const Expanded(
+                    child: Text(
+                      'Notifications',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Row(
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _openScheduleModal,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1565C0),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.add_alarm_rounded, size: 14),
-                        label: const Text(
-                          '+ Schedule',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  const SizedBox(width: 6),
+                  // Test Alert Icon Action
+                  Tooltip(
+                    message: 'Test Phone Alert',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () async {
+                          final ok = await DeviceNotificationService.instance.showTestNotification();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  ok
+                                      ? '🔔 Test phone alert sent! Check your notification bar or lock screen.'
+                                      : 'Alert sent. Please check your notification permissions.',
+                                ),
+                                backgroundColor: const Color(0xFF1565C0),
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.phonelink_ring_rounded, size: 13, color: Colors.blue.shade700),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Test',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.blue.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.close, size: 20, color: Colors.grey),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // + Schedule Button
+                  ElevatedButton.icon(
+                    onPressed: _openScheduleModal,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1565C0),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      elevation: 0,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.add_alarm_rounded, size: 12),
+                    label: const Text(
+                      '+ Schedule',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Close Button
+                  IconButton(
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.close_rounded, size: 19, color: Colors.grey),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // Content & Filter Logic
               Expanded(
                 child: expiringPlansAsync.when(
                   data: (allPlans) {
-                    final expiredCount = allPlans.where((p) => p.category == 'expired' || (p.category == 'scheduled' && p.hoursRemaining < 0)).length;
-                    final todayCount = allPlans.where((p) => p.category == 'today' || (p.category == 'scheduled' && p.hoursRemaining >= 0 && p.hoursRemaining <= 24)).length;
-                    final upcomingCount = allPlans.where((p) => p.category == 'upcoming' || (p.category == 'scheduled' && p.hoursRemaining >= 0 && p.hoursRemaining <= 168)).length;
-                    final scheduledCount = allPlans.where((p) => p.category == 'scheduled').length;
+                    // Synchronize phone lock-screen alerts for due-today or expired plans
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      DeviceNotificationService.instance.syncPlanAlerts(allPlans);
+                    });
+
+                    final effectivePlans = ref.watch(staffFilteredExpiringPlansProvider);
+
+                    final expiredCount = effectivePlans.where((p) => p.category == 'expired' || (p.category == 'scheduled' && p.hoursRemaining < 0)).length;
+                    final todayCount = effectivePlans.where((p) => p.category == 'today' || (p.category == 'scheduled' && p.hoursRemaining >= 0 && p.hoursRemaining <= 24)).length;
+                    final upcomingCount = effectivePlans.where((p) => p.category == 'upcoming' || (p.category == 'scheduled' && p.hoursRemaining >= 0 && p.hoursRemaining <= 168)).length;
+                    final scheduledCount = effectivePlans.where((p) => p.category == 'scheduled').length;
 
                     // Filter list based on selected tab
-                    final filteredPlans = allPlans.where((p) {
+                    final filteredPlans = effectivePlans.where((p) {
                       if (_selectedFilter == 'expired') {
                         return p.category == 'expired' || (p.category == 'scheduled' && p.hoursRemaining < 0);
                       }
@@ -244,21 +302,26 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                         // Interactive Urgency & Scheduled Filter Chips
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
                           child: Row(
                             children: [
-                              _buildUrgencyChip('All', 'all', allPlans.length, Colors.blue.shade700),
-                              const SizedBox(width: 8),
-                              _buildUrgencyChip('📌 Scheduled', 'scheduled', scheduledCount, Colors.indigo.shade700),
-                              const SizedBox(width: 8),
-                              _buildUrgencyChip('🔴 Expired', 'expired', expiredCount, Colors.red.shade700),
-                              const SizedBox(width: 8),
-                              _buildUrgencyChip('🟡 Expiring Today', 'today', todayCount, Colors.orange.shade800),
-                              const SizedBox(width: 8),
-                              _buildUrgencyChip('🔵 Upcoming (7 Days)', 'upcoming', upcomingCount, Colors.teal.shade700),
+                              _buildUrgencyChip('All', 'all', effectivePlans.length, Colors.blue.shade700),
+                              const SizedBox(width: 6),
+                              _buildUrgencyChip('Scheduled', 'scheduled', scheduledCount, Colors.indigo.shade700, icon: Icons.event_available_rounded),
+                              const SizedBox(width: 6),
+                              _buildUrgencyChip('Expired', 'expired', expiredCount, Colors.red.shade700, icon: Icons.error_outline_rounded),
+                              const SizedBox(width: 6),
+                              _buildUrgencyChip('Today', 'today', todayCount, Colors.orange.shade800, icon: Icons.alarm_rounded),
+                              const SizedBox(width: 6),
+                              _buildUrgencyChip('Upcoming', 'upcoming', upcomingCount, Colors.teal.shade700, icon: Icons.calendar_month_rounded),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 8),
+
+                        // Admin Multi-Staff Queue Filter Bar (only renders if admin)
+                        const StaffFilterBar(),
+                        const SizedBox(height: 8),
 
                         Expanded(
                           child: filteredPlans.isEmpty
@@ -282,7 +345,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                               : ListView.separated(
                                   controller: scrollController,
                                   itemCount: filteredPlans.length,
-                                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                  separatorBuilder: (context, index) => const SizedBox(height: 8),
                                   itemBuilder: (context, index) {
                                     final item = filteredPlans[index];
                                     final p = item.patient;
@@ -332,7 +395,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                           ),
                                         ],
                                       ),
-                                      padding: const EdgeInsets.all(12.0),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -416,9 +479,9 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
 
                                           // Patient Context & Care Team Details
                                           if (p.phone.isNotEmpty || p.address.isNotEmpty || careTeam.isNotEmpty || p.selectedServices.isNotEmpty) ...[
-                                            const SizedBox(height: 9),
+                                            const SizedBox(height: 6),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFFF8FAFC),
                                                 borderRadius: BorderRadius.circular(8),
@@ -454,25 +517,31 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                                           style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
                                                         ),
                                                       ],
-                                                      if (p.selectedServices.isNotEmpty) ...[
-                                                        const SizedBox(width: 8),
+                                                    ],
+                                                  ),
+                                                  if (p.selectedServices.isNotEmpty) ...[
+                                                    const SizedBox(height: 3),
+                                                    Row(
+                                                      children: [
+                                                        Icon(Icons.medical_information_outlined, size: 10.5, color: Colors.blueGrey.shade400),
+                                                        const SizedBox(width: 4),
                                                         Expanded(
                                                           child: Text(
-                                                            '• ${p.selectedServices.map((s) => (s['serviceName'] ?? s['name'] ?? '').toString()).where((s) => s.isNotEmpty).join(', ')}',
-                                                            style: TextStyle(fontSize: 9.5, color: Colors.grey.shade600),
+                                                            p.selectedServices.map((s) => (s['serviceName'] ?? s['name'] ?? '').toString()).where((s) => s.isNotEmpty).join(', '),
+                                                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: Colors.blueGrey.shade700),
                                                             maxLines: 1,
                                                             overflow: TextOverflow.ellipsis,
                                                           ),
                                                         ),
                                                       ],
-                                                    ],
-                                                  ),
+                                                    ),
+                                                  ],
                                                   if (p.address.isNotEmpty || careTeam.isNotEmpty) ...[
-                                                    const SizedBox(height: 4),
+                                                    const SizedBox(height: 3),
                                                     Row(
                                                       children: [
                                                         if (p.address.isNotEmpty) ...[
-                                                          Icon(Icons.location_on_outlined, size: 11, color: Colors.grey.shade500),
+                                                          Icon(Icons.location_on_outlined, size: 10.5, color: Colors.grey.shade500),
                                                           const SizedBox(width: 3),
                                                           Expanded(
                                                             child: Text(
@@ -485,15 +554,13 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                                         ],
                                                         if (p.address.isNotEmpty && careTeam.isNotEmpty) const SizedBox(width: 8),
                                                         if (careTeam.isNotEmpty) ...[
-                                                          Icon(Icons.medical_services_outlined, size: 11, color: Colors.indigo.shade400),
+                                                          Icon(Icons.health_and_safety_outlined, size: 10.5, color: Colors.indigo.shade400),
                                                           const SizedBox(width: 3),
-                                                          Flexible(
-                                                            child: Text(
-                                                              careTeam,
-                                                              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: Colors.indigo.shade700),
-                                                              maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
-                                                            ),
+                                                          Text(
+                                                            careTeam,
+                                                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.indigo.shade700),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
                                                           ),
                                                         ],
                                                       ],
@@ -503,82 +570,110 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(height: 10),
+                                          const SizedBox(height: 8),
 
-                                          // Action Buttons: Single Unified Executive Row
+                                          // Action Buttons: 2-Tier Senior Architecture (Zero Overflow on 360px)
+                                          // Tier 1: Primary Executive CTAs (Issue Invoice & WhatsApp)
                                           Row(
                                             children: [
-                                              // Primary Action: Issue Invoice Button
-                                              ElevatedButton.icon(
-                                                onPressed: () {
-                                                  final daysToUse = isScheduled && item.scheduledNotification != null && item.scheduledNotification!.targetDays > 0
-                                                      ? item.scheduledNotification!.targetDays
-                                                      : (item.totalPlanDays > 0 ? item.totalPlanDays : 30);
-                                                  Navigator.pop(context);
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (_) => InvoiceFormScreen(patientId: p.patientId, defaultDays: daysToUse),
-                                                    ),
-                                                  );
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF1565C0),
-                                                  foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6.5),
-                                                  elevation: 0,
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-                                                ),
-                                                icon: const Icon(Icons.receipt_long_rounded, size: 12),
-                                                label: Text(
-                                                  item.isFirstInvoice ? 'First Invoice ➔' : 'Issue Invoice ➔',
-                                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                              Expanded(
+                                                flex: 3,
+                                                child: ElevatedButton.icon(
+                                                  onPressed: () {
+                                                    final daysToUse = isScheduled && item.scheduledNotification != null && item.scheduledNotification!.targetDays > 0
+                                                        ? item.scheduledNotification!.targetDays
+                                                        : (item.totalPlanDays > 0 ? item.totalPlanDays : 30);
+                                                    
+                                                    // Zero-gap billing date continuity
+                                                    final DateTime targetFromDate;
+                                                    if (item.isFirstInvoice) {
+                                                      targetFromDate = DateTime(p.createdAt.year, p.createdAt.month, p.createdAt.day);
+                                                    } else {
+                                                      final exp = item.expirationDate;
+                                                      targetFromDate = DateTime(exp.year, exp.month, exp.day).add(const Duration(days: 1));
+                                                    }
+
+                                                    Navigator.pop(context);
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) => InvoiceFormScreen(
+                                                          patientId: p.patientId,
+                                                          defaultDays: daysToUse,
+                                                          initialFromDate: targetFromDate,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: const Color(0xFF1565C0),
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                    elevation: 0,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.receipt_long_rounded, size: 13),
+                                                  label: Text(
+                                                    item.isFirstInvoice ? 'First Invoice ➔' : 'Issue Invoice ➔',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
                                                 ),
                                               ),
-                                              const SizedBox(width: 5),
-
-                                              // 1-Click WhatsApp Button
-                                              OutlinedButton.icon(
-                                                onPressed: () => _launchWhatsApp(item.whatsappUrl),
-                                                style: OutlinedButton.styleFrom(
-                                                  foregroundColor: const Color(0xFF128C7E),
-                                                  side: const BorderSide(color: Color(0xFF25D366), width: 1.2),
-                                                  backgroundColor: const Color(0xFFF0FDF4),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6.5),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-                                                ),
-                                                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 12, color: Color(0xFF25D366)),
-                                                label: const Text(
-                                                  'WhatsApp',
-                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                flex: 2,
+                                                child: OutlinedButton.icon(
+                                                  onPressed: () => _launchWhatsApp(item.whatsappUrl),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFF128C7E),
+                                                    side: const BorderSide(color: Color(0xFF25D366), width: 1.2),
+                                                    backgroundColor: const Color(0xFFF0FDF4),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Color(0xFF25D366)),
+                                                  label: const Text(
+                                                    'WhatsApp',
+                                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
                                                 ),
                                               ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
 
+                                          // Tier 2: Utility & Resolution Bar (Direct Call, Mark Done, Dismiss)
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
                                               // Direct Call Button
-                                              if (p.phone.isNotEmpty) ...[
-                                                const SizedBox(width: 5),
+                                              if (p.phone.isNotEmpty)
                                                 Tooltip(
                                                   message: 'Direct Call (${p.phone})',
                                                   child: InkWell(
                                                     onTap: () => _launchCall(p.phone),
-                                                    borderRadius: BorderRadius.circular(7),
+                                                    borderRadius: BorderRadius.circular(6),
                                                     child: Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                                                       decoration: BoxDecoration(
                                                         color: Colors.blue.shade50,
-                                                        borderRadius: BorderRadius.circular(7),
+                                                        borderRadius: BorderRadius.circular(6),
                                                         border: Border.all(color: Colors.blue.shade200),
                                                       ),
                                                       child: Row(
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
-                                                          Icon(Icons.phone_in_talk_rounded, color: Colors.blue.shade700, size: 12),
-                                                          const SizedBox(width: 3),
+                                                          Icon(Icons.phone_in_talk_rounded, color: Colors.blue.shade700, size: 11),
+                                                          const SizedBox(width: 4),
                                                           Text(
                                                             'Call',
                                                             style: TextStyle(
-                                                              fontSize: 9.5,
-                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.w600,
                                                               color: Colors.blue.shade800,
                                                             ),
                                                           ),
@@ -586,60 +681,76 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
+                                                )
+                                              else
+                                                const SizedBox.shrink(),
 
-                                              const Spacer(),
-
-                                              // Done / Handled Button (for all notifications)
-                                              Tooltip(
-                                                message: 'Mark as Handled / Done',
-                                                child: InkWell(
-                                                  onTap: () => _handleDone(item),
-                                                  borderRadius: BorderRadius.circular(7),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.green.shade50,
-                                                      borderRadius: BorderRadius.circular(7),
-                                                      border: Border.all(color: Colors.green.shade300),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 13),
-                                                        const SizedBox(width: 3),
-                                                        Text(
-                                                          'Done',
-                                                          style: TextStyle(
-                                                            fontSize: 9.5,
-                                                            fontWeight: FontWeight.bold,
-                                                            color: Colors.green.shade800,
-                                                          ),
+                                              // Resolution Cluster (Done & Dismiss)
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Tooltip(
+                                                    message: 'Mark as Handled / Done',
+                                                    child: InkWell(
+                                                      onTap: () => _handleDone(item),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.green.shade50,
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          border: Border.all(color: Colors.green.shade300),
                                                         ),
-                                                      ],
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 12),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              'Done',
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: Colors.green.shade800,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 5),
-
-                                              // Delete / Dismiss Button (for all notifications)
-                                              Tooltip(
-                                                message: 'Dismiss / Delete Notification',
-                                                child: InkWell(
-                                                  onTap: () => _handleDelete(item),
-                                                  borderRadius: BorderRadius.circular(7),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.all(5.5),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.red.shade50,
-                                                      borderRadius: BorderRadius.circular(7),
-                                                      border: Border.all(color: Colors.red.shade200),
+                                                  const SizedBox(width: 6),
+                                                  Tooltip(
+                                                    message: 'Dismiss / Delete Notification',
+                                                    child: InkWell(
+                                                      onTap: () => _handleDelete(item),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.red.shade50,
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          border: Border.all(color: Colors.red.shade200),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(Icons.delete_outline_rounded, color: Colors.red.shade700, size: 12),
+                                                            const SizedBox(width: 3),
+                                                            Text(
+                                                              'Dismiss',
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                fontWeight: FontWeight.w600,
+                                                                color: Colors.red.shade700,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                     ),
-                                                    child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade700, size: 13),
                                                   ),
-                                                ),
+                                                ],
                                               ),
                                             ],
                                           ),
@@ -663,28 +774,72 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
     );
   }
 
-  Widget _buildUrgencyChip(String label, String value, int count, Color color) {
+  Widget _buildUrgencyChip(String label, String value, int count, Color color, {IconData? icon}) {
     final isSelected = _selectedFilter == value;
-    return ChoiceChip(
-      label: Text(
-        '$label ($count)',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.white : color,
-        ),
-      ),
-      selected: isSelected,
-      selectedColor: color,
-      backgroundColor: Colors.white,
-      side: BorderSide(color: isSelected ? color : Colors.grey.shade300),
-      onSelected: (selected) {
-        if (selected) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
           setState(() {
             _selectedFilter = value;
           });
-        }
-      },
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? color : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.shade300,
+              width: 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.25),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1.5),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 12, color: isSelected ? Colors.white : color),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : Colors.blueGrey.shade800,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withValues(alpha: 0.25) : color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? Colors.white : color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

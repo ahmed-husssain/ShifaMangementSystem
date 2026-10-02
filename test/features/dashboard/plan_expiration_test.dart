@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shifa_management/features/patients/domain/patient_model.dart';
 import 'package:shifa_management/features/invoices/domain/invoice_model.dart';
-import 'package:shifa_management/features/dashboard/domain/scheduled_notification_model.dart';
 import 'package:shifa_management/shared/providers/plan_expiration_provider.dart';
 
 void main() {
