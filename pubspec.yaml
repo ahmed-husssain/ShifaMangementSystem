@@ -41,6 +41,7 @@ dependencies:
   path_provider: ^2.1.6
   intl: ^0.20.3
   url_launcher: ^6.3.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

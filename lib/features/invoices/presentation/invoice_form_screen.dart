@@ -13,6 +13,7 @@ import '../../../shared/providers/auth_provider.dart';
 import '../../patients/domain/patient_model.dart';
 import '../../patients/data/patient_repository.dart';
 import '../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../../shared/providers/form_draft_provider.dart';
 import 'widgets/components/invoice_header_section.dart';
 import 'widgets/components/invoice_patient_section.dart';
 import 'widgets/components/invoice_items_table.dart';
@@ -76,16 +77,108 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   final TextEditingController _cnicController = TextEditingController();
   bool _isSearchingPatient = false;
   String? _searchStatusMessage;
+  bool _draftRestored = false;
 
   @override
   void initState() {
     super.initState();
     _days = widget.defaultDays > 0 ? widget.defaultDays : 15;
     _toDate = _fromDate.add(Duration(days: _days));
+
+    _nameController.addListener(_autoSaveDraft);
+    _phoneController.addListener(_autoSaveDraft);
+    _addressController.addListener(_autoSaveDraft);
+    _cnicController.addListener(_autoSaveDraft);
+    _mrNumberController.addListener(_autoSaveDraft);
+
     if (widget.patientId != null && widget.patientId!.isNotEmpty) {
       _loadPatient();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndRestoreDraft();
+      });
     }
     _generateInvoiceNumber();
+  }
+
+  void _checkAndRestoreDraft() {
+    if (widget.patientId != null && widget.patientId!.isNotEmpty) return;
+    final draft = ref.read(invoiceFormDraftProvider);
+    if (draft.hasDraft) {
+      setState(() {
+        if (draft.mrNumber.isNotEmpty) _mrNumberController.text = draft.mrNumber;
+        if (draft.patientName.isNotEmpty) _nameController.text = draft.patientName;
+        if (draft.phone.isNotEmpty) _phoneController.text = draft.phone;
+        if (draft.address.isNotEmpty) _addressController.text = draft.address;
+        if (draft.cnic.isNotEmpty) _cnicController.text = draft.cnic;
+        _paymentStatus = draft.paymentStatus;
+        _days = draft.days;
+        _discount = draft.discount;
+        if (draft.fromDateIso.isNotEmpty) {
+          _fromDate = DateTime.tryParse(draft.fromDateIso) ?? _fromDate;
+        }
+        if (draft.toDateIso.isNotEmpty) {
+          _toDate = DateTime.tryParse(draft.toDateIso) ?? _toDate;
+        }
+        if (draft.items.isNotEmpty) {
+          _items.clear();
+          for (final c in _itemDaysControllers) {
+            c.dispose();
+          }
+          _itemDaysControllers.clear();
+          for (final it in draft.items) {
+            final parsedItem = InvoiceItem.fromMap(it);
+            _items.add(parsedItem);
+            _itemDaysControllers.add(TextEditingController(text: parsedItem.quantity.toString()));
+          }
+        }
+        _draftRestored = true;
+      });
+    }
+  }
+
+  void _clearDraftAndReset() {
+    ref.read(invoiceFormDraftProvider.notifier).clearDraft();
+    setState(() {
+      _nameController.clear();
+      _phoneController.clear();
+      _addressController.clear();
+      _cnicController.clear();
+      _mrNumberController.clear();
+      _items.clear();
+      for (final c in _itemDaysControllers) {
+        c.dispose();
+      }
+      _itemDaysControllers.clear();
+      _discount = 0.0;
+      _paymentStatus = 'Unpaid';
+      _days = widget.defaultDays > 0 ? widget.defaultDays : 15;
+      _fromDate = DateTime.now();
+      _toDate = _fromDate.add(Duration(days: _days));
+      _patient = null;
+      _draftRestored = false;
+    });
+    _generateInvoiceNumber();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invoice draft cleared.')),
+    );
+  }
+
+  void _autoSaveDraft() {
+    ref.read(invoiceFormDraftProvider.notifier).saveDraft(
+      patientId: widget.patientId ?? _patient?.patientId,
+      mrNumber: _mrNumberController.text.trim(),
+      patientName: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      address: _addressController.text.trim(),
+      cnic: _cnicController.text.trim(),
+      paymentStatus: _paymentStatus,
+      days: _days,
+      discount: _discount,
+      items: _items.map((i) => i.toMap()).toList(),
+      fromDate: _fromDate,
+      toDate: _toDate,
+    );
   }
 
   @override
@@ -303,6 +396,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       _items.add(InvoiceItem(serviceName: '', price: 0, quantity: _days));
       _itemDaysControllers.add(TextEditingController(text: _days.toString()));
     });
+    _autoSaveDraft();
   }
 
   void _removeItem(int index) {
@@ -313,6 +407,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         _itemDaysControllers.removeAt(index);
       }
     });
+    _autoSaveDraft();
   }
 
   void _updateItem(int index, {String? name, double? price, int? qty}) {
@@ -328,6 +423,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         }
       }
     });
+    _autoSaveDraft();
   }
 
   double get _subtotal => _items.fold(0.0, (acc, item) => acc + item.total);
@@ -468,6 +564,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       );
 
       final newDocId = await repo.createInvoice(invoice, userName: userName);
+      ref.read(invoiceFormDraftProvider.notifier).clearDraft();
       ref.invalidate(allInvoicesProvider(false));
       ref.invalidate(allInvoicesProvider(true));
       ref.invalidate(staffInvoicesProvider);
@@ -681,6 +778,37 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
+                  if (_draftRestored) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history_rounded, size: 18, color: Color(0xFFB45309)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Unsaved invoice draft restored from previous session.',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _clearDraftAndReset,
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            child: const Text('Clear Draft', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   // ─── Invoice Header Card ───
                   Container(
                     padding: const EdgeInsets.all(24),

@@ -9,6 +9,7 @@ import '../../../core/errors/app_error.dart';
 import '../../invoices/data/invoice_repository.dart';
 import '../../dashboard/presentation/pages/dashboard_page.dart';
 import 'widgets/healthcare_services_selector.dart';
+import '../../../shared/providers/form_draft_provider.dart';
 
 class CnicInputFormatter extends TextInputFormatter {
   @override
@@ -79,6 +80,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
   double _monthlyServiceCost = 0.0;
   
   bool _isLoading = false;
+  bool _draftRestored = false;
 
   @override
   void initState() {
@@ -104,13 +106,91 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
     _patientAmountController.addListener(() => setState(() {}));
     _staffPaymentController.addListener(() => setState(() {}));
     _daysController.addListener(() => setState(() {}));
+
+    _nameController.addListener(_autoSaveDraft);
+    _cnicController.addListener(_autoSaveDraft);
+    _phoneController.addListener(_autoSaveDraft);
+    _addressController.addListener(_autoSaveDraft);
+    _diagnosisController.addListener(_autoSaveDraft);
+    _doctorController.addListener(_autoSaveDraft);
+    _nurseController.addListener(_autoSaveDraft);
+    _caretakerController.addListener(_autoSaveDraft);
+    _patientAmountController.addListener(_autoSaveDraft);
+    _staffPaymentController.addListener(_autoSaveDraft);
+    _daysController.addListener(_autoSaveDraft);
     
     if (widget.existingPatient == null) {
-      // Defer loading to allow context/ref to be fully available
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndRestoreDraft();
         _loadNextMRNumber();
       });
     }
+  }
+
+  void _checkAndRestoreDraft() {
+    if (widget.existingPatient != null) return;
+    final draft = ref.read(patientRegistrationDraftProvider);
+    if (draft.hasDraft) {
+      setState(() {
+        if (draft.patientName.isNotEmpty) _nameController.text = draft.patientName;
+        if (draft.cnic.isNotEmpty) _cnicController.text = draft.cnic;
+        if (draft.phone.isNotEmpty) _phoneController.text = draft.phone;
+        if (draft.address.isNotEmpty) _addressController.text = draft.address;
+        if (draft.diagnosis.isNotEmpty) _diagnosisController.text = draft.diagnosis;
+        if (draft.doctor.isNotEmpty) _doctorController.text = draft.doctor;
+        if (draft.nurse.isNotEmpty) _nurseController.text = draft.nurse;
+        if (draft.caretaker.isNotEmpty) _caretakerController.text = draft.caretaker;
+        if (draft.patientAmount.isNotEmpty) _patientAmountController.text = draft.patientAmount;
+        if (draft.staffPayment.isNotEmpty) _staffPaymentController.text = draft.staffPayment;
+        if (draft.days.isNotEmpty) _daysController.text = draft.days;
+        if (draft.selectedServices.isNotEmpty) _selectedServices = List.from(draft.selectedServices);
+        if (draft.monthlyServiceCost > 0) _monthlyServiceCost = draft.monthlyServiceCost;
+        _draftRestored = true;
+      });
+    }
+  }
+
+  void _clearDraftAndReset() {
+    ref.read(patientRegistrationDraftProvider.notifier).clearDraft();
+    setState(() {
+      _nameController.clear();
+      _cnicController.clear();
+      _phoneController.clear();
+      _addressController.clear();
+      _diagnosisController.clear();
+      _doctorController.clear();
+      _nurseController.clear();
+      _caretakerController.clear();
+      _patientAmountController.clear();
+      _staffPaymentController.clear();
+      _daysController.clear();
+      _selectedServices.clear();
+      _monthlyServiceCost = 0.0;
+      _draftRestored = false;
+    });
+    _loadNextMRNumber();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Registration draft cleared.')),
+    );
+  }
+
+  void _autoSaveDraft() {
+    if (widget.existingPatient != null) return;
+    ref.read(patientRegistrationDraftProvider.notifier).saveDraft(
+      patientName: _nameController.text.trim(),
+      cnic: _cnicController.text.trim(),
+      phone: _phoneController.text.trim(),
+      address: _addressController.text.trim(),
+      diagnosis: _diagnosisController.text.trim(),
+      doctor: _doctorController.text.trim(),
+      nurse: _nurseController.text.trim(),
+      caretaker: _caretakerController.text.trim(),
+      patientAmount: _patientAmountController.text.trim(),
+      staffPayment: _staffPaymentController.text.trim(),
+      days: _daysController.text.trim(),
+      selectedServices: _selectedServices,
+      monthlyServiceCost: _monthlyServiceCost,
+    );
   }
 
   void _loadNextMRNumber() async {
@@ -258,6 +338,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
           isDeleted: patient.isDeleted,
         );
         await repo.createPatient(finalPatient, userName: userName);
+        ref.read(patientRegistrationDraftProvider.notifier).clearDraft();
       }
 
       ref.invalidate(allPatientsProvider(false));
@@ -306,6 +387,37 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_draftRestored) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history_rounded, size: 18, color: Color(0xFFB45309)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Unsaved registration draft restored from previous session.',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _clearDraftAndReset,
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            child: const Text('Clear Draft', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   _buildSectionCard(
                     title: '1. Patient Information',
                     children: [
@@ -391,6 +503,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
                             _selectedServices = services;
                             _monthlyServiceCost = cost;
                           });
+                          _autoSaveDraft();
                         },
                       ),
                     ],
