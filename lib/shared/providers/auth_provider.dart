@@ -25,7 +25,18 @@ final splashCompletedProvider = NotifierProvider<SplashCompletedNotifier, bool>(
 
 final authStateProvider = StreamProvider<User?>((ref) {
   final supabase = ref.watch(supabaseClientProvider);
-  return supabase.auth.onAuthStateChange.map((data) => data.session?.user);
+  final initialUser = supabase.auth.currentUser;
+  final authStream = supabase.auth.onAuthStateChange.map((data) => data.session?.user);
+
+  return Stream<User?>.multi((controller) {
+    controller.add(initialUser);
+    final sub = authStream.listen(
+      (user) => controller.add(user),
+      onError: (err, st) => controller.addError(err, st),
+      onDone: () => controller.close(),
+    );
+    controller.onCancel = () => sub.cancel();
+  });
 });
 
 class LoginErrorMessageNotifier extends Notifier<String?> {
