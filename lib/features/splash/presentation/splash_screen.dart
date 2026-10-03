@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/providers/auth_provider.dart';
@@ -13,6 +14,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  Timer? _safetyTimer;
+
+  void _markCompleted() {
+    if (mounted && !ref.read(splashCompletedProvider)) {
+      ref.read(splashCompletedProvider.notifier).setCompleted(true);
+    }
+  }
 
   @override
   void initState() {
@@ -38,8 +46,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        ref.read(splashCompletedProvider.notifier).setCompleted(true);
+        _markCompleted();
       }
+    });
+
+    // Safety fallback: ensure transition proceeds even if frames are throttled on device launch
+    _safetyTimer = Timer(const Duration(milliseconds: 2400), () {
+      _markCompleted();
     });
 
     _controller.forward();
@@ -47,6 +60,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   @override
   void dispose() {
+    _safetyTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

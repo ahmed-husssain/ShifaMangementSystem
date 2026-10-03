@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../shared/providers/auth_provider.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../presentation/main_layout.dart';
@@ -47,27 +48,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return isSplash ? null : '/splash';
       }
 
+      // Check auth state with fallback to synchronous client currentUser
       final authState = ref.read(authStateProvider);
-      if (authState.isLoading) {
-        // While re-authenticating or reconnecting on app resume,
-        // do NOT kick the user out of where they already are!
-        return null;
-      }
+      final clientUser = Supabase.instance.client.auth.currentUser;
+      final user = authState.value ?? clientUser;
 
-      final user = authState.value;
+      // If user is definitely not authenticated
       if (user == null) {
+        if (isSplash) return '/login';
+        if (authState.isLoading) return null; // do not kick from active screen during resume
         return isLoggingIn ? null : '/login';
       }
 
       final userProfile = ref.read(userProfileProvider);
-      // If user is logged in, wait for profile or use fallback without redirecting away
+      // If user is authenticated and on splash, don't stall waiting for remote profile fetch;
+      // proceed directly to dashboard (which has fallback token metadata)
       if (userProfile.isLoading && !userProfile.hasValue) {
+        if (isSplash || isLoggingIn) return '/dashboard';
         return null;
       }
 
       final profile = userProfile.value;
       if (profile == null) {
-        return isLoggingIn ? null : '/login';
+        if (isSplash || !isLoggingIn) return '/dashboard';
+        return null;
       }
 
       // Check if the account has been deactivated
