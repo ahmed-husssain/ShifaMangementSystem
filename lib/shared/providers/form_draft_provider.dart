@@ -15,6 +15,7 @@ class PatientRegistrationDraft {
   final String doctor;
   final String nurse;
   final String caretaker;
+  final String staffPhone;
   final String patientAmount;
   final String staffPayment;
   final String days;
@@ -31,6 +32,7 @@ class PatientRegistrationDraft {
     this.doctor = '',
     this.nurse = '',
     this.caretaker = '',
+    this.staffPhone = '',
     this.patientAmount = '',
     this.staffPayment = '',
     this.days = '',
@@ -48,6 +50,7 @@ class PatientRegistrationDraft {
     String? doctor,
     String? nurse,
     String? caretaker,
+    String? staffPhone,
     String? patientAmount,
     String? staffPayment,
     String? days,
@@ -64,6 +67,7 @@ class PatientRegistrationDraft {
       doctor: doctor ?? this.doctor,
       nurse: nurse ?? this.nurse,
       caretaker: caretaker ?? this.caretaker,
+      staffPhone: staffPhone ?? this.staffPhone,
       patientAmount: patientAmount ?? this.patientAmount,
       staffPayment: staffPayment ?? this.staffPayment,
       days: days ?? this.days,
@@ -83,6 +87,7 @@ class PatientRegistrationDraft {
       'doctor': doctor,
       'nurse': nurse,
       'caretaker': caretaker,
+      'staffPhone': staffPhone,
       'patientAmount': patientAmount,
       'staffPayment': staffPayment,
       'days': days,
@@ -102,6 +107,7 @@ class PatientRegistrationDraft {
       doctor: (map['doctor'] ?? '').toString(),
       nurse: (map['nurse'] ?? '').toString(),
       caretaker: (map['caretaker'] ?? '').toString(),
+      staffPhone: (map['staffPhone'] ?? '').toString(),
       patientAmount: (map['patientAmount'] ?? '').toString(),
       staffPayment: (map['staffPayment'] ?? '').toString(),
       days: (map['days'] ?? '').toString(),
@@ -141,6 +147,7 @@ class PatientRegistrationDraftNotifier extends Notifier<PatientRegistrationDraft
     required String doctor,
     required String nurse,
     required String caretaker,
+    String staffPhone = '',
     required String patientAmount,
     required String staffPayment,
     required String days,
@@ -155,6 +162,7 @@ class PatientRegistrationDraftNotifier extends Notifier<PatientRegistrationDraft
         doctor.isNotEmpty ||
         nurse.isNotEmpty ||
         caretaker.isNotEmpty ||
+        staffPhone.isNotEmpty ||
         selectedServices.isNotEmpty;
 
     if (!isNotEmpty) return;
@@ -168,6 +176,7 @@ class PatientRegistrationDraftNotifier extends Notifier<PatientRegistrationDraft
       doctor: doctor,
       nurse: nurse,
       caretaker: caretaker,
+      staffPhone: staffPhone,
       patientAmount: patientAmount,
       staffPayment: staffPayment,
       days: days,
@@ -197,7 +206,6 @@ final patientRegistrationDraftProvider =
     NotifierProvider<PatientRegistrationDraftNotifier, PatientRegistrationDraft>(
   PatientRegistrationDraftNotifier.new,
 );
-
 
 // ==========================================
 // 2. INVOICE FORM DRAFT

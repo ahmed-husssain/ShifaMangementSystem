@@ -48,10 +48,10 @@ class FinancesPage extends ConsumerWidget {
 
     return patientsAsync.when(
       data: (patients) {
-        final activePatients = patients.where((p) => !p.isDiscontinued).toList();
+        final activePatients = patients.where((p) => !p.isDiscontinued && !p.isDeleted).toList();
         final invoices = invoicesAsync.value ?? [];
         final patientMap = <String, Patient>{};
-        for (final p in patients) {
+        for (final p in activePatients) {
           if (p.patientId.isNotEmpty) patientMap[p.patientId] = p;
           if (p.mrNumber.isNotEmpty) patientMap[p.mrNumber] = p;
         }
@@ -79,7 +79,9 @@ class FinancesPage extends ConsumerWidget {
                 : (inv.items.isNotEmpty && inv.items.first.quantity > 0
                     ? inv.items.first.quantity
                     : (inv.toDate != null && inv.fromDate != null
-                        ? inv.toDate!.difference(inv.fromDate!).inDays
+                        ? (inv.toDate!.difference(inv.fromDate!).inDays > 0
+                            ? inv.toDate!.difference(inv.fromDate!).inDays
+                            : 1)
                         : 1));
             totalPayout += invoiceDays * staffDailyRate;
           }
@@ -228,7 +230,9 @@ class FinancesPage extends ConsumerWidget {
                   : (inv.items.isNotEmpty && inv.items.first.quantity > 0
                       ? inv.items.first.quantity
                       : (inv.toDate != null && inv.fromDate != null
-                          ? inv.toDate!.difference(inv.fromDate!).inDays
+                          ? (inv.toDate!.difference(inv.fromDate!).inDays > 0
+                              ? inv.toDate!.difference(inv.fromDate!).inDays
+                              : 1)
                           : 1));
               totalPayout += invoiceDays * staffDailyRate;
             }

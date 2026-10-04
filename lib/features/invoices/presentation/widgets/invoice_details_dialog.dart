@@ -278,7 +278,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       // 3. Update Invoice in Supabase
       final updatedInvoice = Invoice(
         invoiceId: widget.invoice.invoiceId,
-        invoiceNumber: _invoiceNumberController.text.trim(),
+        invoiceNumber: widget.invoice.invoiceNumber,
         patientId: widget.invoice.patientId,
         staffId: widget.invoice.staffId,
         subtotal: newSubtotal,

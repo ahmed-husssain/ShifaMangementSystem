@@ -11,6 +11,7 @@ class Patient {
   final String doctor;
   final String nurse;
   final String caretaker;
+  final String staffPhone;
   final List<Map<String, dynamic>> selectedServices;
   final double monthlyServiceCost;
   final double patientAmount;
@@ -44,6 +45,7 @@ class Patient {
     required this.doctor,
     required this.nurse,
     required this.caretaker,
+    this.staffPhone = '',
     required this.selectedServices,
     required this.monthlyServiceCost,
     required this.patientAmount,
@@ -92,6 +94,24 @@ class Patient {
 
     final now = DateTime.now();
 
+    final rawServices = data['selectedServices'] ?? data['selected_services'];
+    final List<Map<String, dynamic>> parsedServices = [];
+    if (rawServices is List) {
+      for (final item in rawServices) {
+        if (item is Map) {
+          try {
+            parsedServices.add(Map<String, dynamic>.from(item));
+          } catch (_) {}
+        }
+      }
+    }
+
+    double parseDouble(dynamic val) {
+      if (val is num) return val.toDouble();
+      if (val != null) return double.tryParse(val.toString().replaceAll(',', '')) ?? 0.0;
+      return 0.0;
+    }
+
     return Patient(
       patientId: documentId,
       mrNumber: (data['mrNumber'] ?? data['mr_number'] ?? '').toString(),
@@ -103,11 +123,12 @@ class Patient {
       doctor: (data['doctor'] ?? '').toString(),
       nurse: (data['nurse'] ?? '').toString(),
       caretaker: (data['caretaker'] ?? '').toString(),
-      selectedServices: List<Map<String, dynamic>>.from(data['selectedServices'] ?? data['selected_services'] ?? []),
-      monthlyServiceCost: (data['monthlyServiceCost'] ?? data['monthly_service_cost'] ?? 0.0).toDouble(),
-      patientAmount: (data['patientAmount'] ?? data['patient_amount'] ?? 0.0).toDouble(),
-      staffPayment: (data['staffPayment'] ?? data['staff_payment'] ?? 0.0).toDouble(),
-      profit: (data['profit'] ?? 0.0).toDouble(),
+      staffPhone: (data['staffPhone'] ?? data['staff_phone'] ?? '').toString(),
+      selectedServices: parsedServices,
+      monthlyServiceCost: parseDouble(data['monthlyServiceCost'] ?? data['monthly_service_cost']),
+      patientAmount: parseDouble(data['patientAmount'] ?? data['patient_amount']),
+      staffPayment: parseDouble(data['staffPayment'] ?? data['staff_payment']),
+      profit: parseDouble(data['profit']),
       days: (data['days'] is num ? (data['days'] as num).toInt() : int.tryParse(data['days']?.toString() ?? '0') ?? 0),
       assignedStaffId: (data['assignedStaffId'] ?? data['assigned_staff_id'] ?? '').toString(),
       organizationId: (data['organizationId'] ?? data['organization_id'] ?? 'default').toString(),
@@ -138,6 +159,7 @@ class Patient {
       'doctor': doctor,
       'nurse': nurse,
       'caretaker': caretaker,
+      'staffPhone': staffPhone,
       'selectedServices': selectedServices,
       'monthlyServiceCost': monthlyServiceCost,
       'patientAmount': patientAmount,
@@ -174,6 +196,7 @@ class Patient {
       'doctor': doctor,
       'nurse': nurse,
       'caretaker': caretaker,
+      'staff_phone': staffPhone,
       'selected_services': selectedServices,
       'monthly_service_cost': monthlyServiceCost,
       'patient_amount': patientAmount,

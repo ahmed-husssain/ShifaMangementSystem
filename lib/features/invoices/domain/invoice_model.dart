@@ -7,15 +7,36 @@ class InvoiceItem {
     required this.serviceName,
     required this.price,
     required this.quantity,
-  });
+  }) {
+    if (quantity < 1) {
+      throw ArgumentError('Quantity must be at least 1.');
+    }
+  }
 
   double get total => price * quantity;
 
   factory InvoiceItem.fromMap(Map<String, dynamic> data) {
+    final rawPrice = data['price'];
+    double parsedPrice = 0.0;
+    if (rawPrice is num) {
+      parsedPrice = rawPrice.toDouble();
+    } else if (rawPrice != null) {
+      parsedPrice = double.tryParse(rawPrice.toString().replaceAll(',', '')) ?? 0.0;
+    }
+
+    final rawQty = data['quantity'];
+    int parsedQty = 1;
+    if (rawQty is num) {
+      parsedQty = rawQty.toInt();
+    } else if (rawQty != null) {
+      parsedQty = int.tryParse(rawQty.toString()) ?? 1;
+    }
+    if (parsedQty < 1) parsedQty = 1;
+
     return InvoiceItem(
-      serviceName: data['serviceName'] ?? '',
-      price: (data['price'] ?? 0).toDouble(),
-      quantity: data['quantity'] ?? 1,
+      serviceName: (data['serviceName'] ?? data['service_name'] ?? '').toString(),
+      price: parsedPrice,
+      quantity: parsedQty,
     );
   }
 
@@ -80,7 +101,16 @@ class Invoice {
     this.createdByName,
     this.createdByRole,
     this.createdByUid,
-  });
+  }) {
+    if (discount < 0) {
+      throw ArgumentError('Discount cannot be negative.');
+    }
+    if (fromDate != null && toDate != null) {
+      if (toDate!.isBefore(fromDate!)) {
+        throw ArgumentError('To date cannot be earlier than From date.');
+      }
+    }
+  }
 
   factory Invoice.fromMap(Map<String, dynamic> data, String documentId) {
     DateTime? parseDate(dynamic val) {
@@ -105,25 +135,53 @@ class Invoice {
       }
     }
     if (parsedDays <= 0) {
-      final from = parseDate(data['fromDate']);
-      final to = parseDate(data['toDate']);
+      final from = parseDate(data['fromDate'] ?? data['from_date']);
+      final to = parseDate(data['toDate'] ?? data['to_date']);
       if (from != null && to != null) {
         final diff = to.difference(from).inDays;
         if (diff > 0) parsedDays = diff;
       }
     }
 
+    final rawSubtotal = data['subtotal'];
+    double parsedSubtotal = 0.0;
+    if (rawSubtotal is num) {
+      parsedSubtotal = rawSubtotal.toDouble();
+    } else if (rawSubtotal != null) {
+      parsedSubtotal = double.tryParse(rawSubtotal.toString().replaceAll(',', '')) ?? 0.0;
+    }
+
+    final rawDiscount = data['discount'];
+    double parsedDiscount = 0.0;
+    if (rawDiscount is num) {
+      parsedDiscount = rawDiscount.toDouble();
+    } else if (rawDiscount != null) {
+      parsedDiscount = double.tryParse(rawDiscount.toString().replaceAll(',', '')) ?? 0.0;
+    }
+
+    final rawGrandTotal = data['grandTotal'] ?? data['grand_total'];
+    double parsedGrandTotal = 0.0;
+    if (rawGrandTotal is num) {
+      parsedGrandTotal = rawGrandTotal.toDouble();
+    } else if (rawGrandTotal != null) {
+      parsedGrandTotal = double.tryParse(rawGrandTotal.toString().replaceAll(',', '')) ?? 0.0;
+    }
+
+    final rawItems = data['items'] as List<dynamic>? ?? [];
+    final parsedItems = rawItems
+        .whereType<Map>()
+        .map((item) => InvoiceItem.fromMap(Map<String, dynamic>.from(item)))
+        .toList();
+
     return Invoice(
       invoiceId: documentId,
       invoiceNumber: (data['invoiceNumber'] ?? data['invoice_number'] ?? (documentId.length > 8 ? documentId.substring(0, 8).toUpperCase() : documentId)).toString(),
       patientId: (data['patientId'] ?? data['patient_id'] ?? '').toString(),
       staffId: (data['staffId'] ?? data['staff_id'] ?? '').toString(),
-      subtotal: (data['subtotal'] ?? 0).toDouble(),
-      discount: (data['discount'] ?? 0).toDouble(),
-      grandTotal: (data['grandTotal'] ?? data['grand_total'] ?? 0).toDouble(),
-      items: (data['items'] as List<dynamic>? ?? [])
-          .map((item) => InvoiceItem.fromMap(Map<String, dynamic>.from(item as Map)))
-          .toList(),
+      subtotal: parsedSubtotal,
+      discount: parsedDiscount < 0 ? 0.0 : parsedDiscount,
+      grandTotal: parsedGrandTotal < 0 ? 0.0 : parsedGrandTotal,
+      items: parsedItems,
       organizationId: (data['organizationId'] ?? data['organization_id'] ?? 'default').toString(),
       createdBy: (data['createdBy'] ?? data['created_by'] ?? '').toString(),
       createdAt: parseDate(data['createdAt'] ?? data['created_at']) ?? DateTime.now(),
