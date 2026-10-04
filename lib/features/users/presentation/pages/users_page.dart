@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Cloud Firestore removed - using Supabase
 
@@ -708,6 +709,18 @@ class _UserDetailsModalState extends ConsumerState<_UserDetailsModal> {
       }
     }
 
+    final phoneText = _phoneController.text.trim();
+    if (phoneText.isNotEmpty && !RegExp(r'^\d{1,15}$').hasMatch(phoneText)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone number must contain digits only.'),
+          backgroundColor: Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _statusMessage = newPass.isNotEmpty ? 'Updating user password...' : 'Updating user details...';
@@ -936,6 +949,11 @@ class _UserDetailsModalState extends ConsumerState<_UserDetailsModal> {
             TextFormField(
               controller: _phoneController,
               enabled: !_isSaving,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(15),
+              ],
               decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 14),

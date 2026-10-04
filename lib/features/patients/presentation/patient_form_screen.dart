@@ -54,11 +54,13 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
   final _nameKey = GlobalKey();
   final _cnicKey = GlobalKey();
   final _phoneKey = GlobalKey();
+  final _staffPhoneKey = GlobalKey();
   final _addressKey = GlobalKey();
 
   final _nameFocusNode = FocusNode();
   final _cnicFocusNode = FocusNode();
   final _phoneFocusNode = FocusNode();
+  final _staffPhoneFocusNode = FocusNode();
   final _addressFocusNode = FocusNode();
 
   late TextEditingController _nameController;
@@ -229,6 +231,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
     _nameFocusNode.dispose();
     _cnicFocusNode.dispose();
     _phoneFocusNode.dispose();
+    _staffPhoneFocusNode.dispose();
     _addressFocusNode.dispose();
     super.dispose();
   }
@@ -267,6 +270,11 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
       final phoneVal = _phoneController.text.trim();
       if (phoneVal.isEmpty || !RegExp(r'^\d{1,15}$').hasMatch(phoneVal)) {
         _scrollToAndFocus(_phoneKey, _phoneFocusNode);
+        return;
+      }
+      final staffPhoneVal = _staffPhoneController.text.trim();
+      if (staffPhoneVal.isNotEmpty && !RegExp(r'^\d{1,15}$').hasMatch(staffPhoneVal)) {
+        _scrollToAndFocus(_staffPhoneKey, _staffPhoneFocusNode);
         return;
       }
       if (_addressController.text.trim().isEmpty) {
@@ -499,7 +507,24 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
                       _buildField(_doctorController, 'Doctor'),
                       _buildField(_nurseController, 'Nurse'),
                       _buildField(_caretakerController, 'Caretaker'),
-                      _buildField(_staffPhoneController, 'Staff Phone / WhatsApp', isPhone: true),
+                      _buildField(
+                        _staffPhoneController,
+                        'Staff Phone / WhatsApp',
+                        isPhone: true,
+                        focusNode: _staffPhoneFocusNode,
+                        fieldKey: _staffPhoneKey,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(15),
+                        ],
+                        validator: (v) {
+                          final trimmed = v?.trim() ?? '';
+                          if (trimmed.isNotEmpty && !RegExp(r'^\d{1,15}$').hasMatch(trimmed)) {
+                            return 'Staff phone must contain digits only';
+                          }
+                          return null;
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -632,6 +657,11 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
     List<TextInputFormatter> formatters = inputFormatters ?? [];
     if (isNumber && inputFormatters == null) {
       formatters = [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))];
+    } else if (isPhone && inputFormatters == null) {
+      formatters = [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(15),
+      ];
     }
 
     return Padding(
@@ -654,7 +684,15 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
         ),
         validator: validator ?? (required 
           ? (v) => (v == null || v.isEmpty) ? 'Required field' : null 
-          : null),
+          : (isPhone
+              ? (v) {
+                  final trimmed = v?.trim() ?? '';
+                  if (trimmed.isNotEmpty && !RegExp(r'^\d{1,15}$').hasMatch(trimmed)) {
+                    return '$label must contain digits only';
+                  }
+                  return null;
+                }
+              : null)),
       ),
     );
   }
