@@ -169,11 +169,14 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                   }
 
                   final filteredInvoices = invoices.where((inv) {
+                    if (inv.isDeleted || inv.isDiscontinued) return false;
+                    final p = patientMap[inv.patientId];
+                    if (p != null && (p.isDiscontinued || p.isDeleted)) return false;
+
                     if (searchQuery.isEmpty) return true;
 
                     final invNum = inv.invoiceNumber.toLowerCase();
                     final pId = inv.patientId.toLowerCase();
-                    final p = patientMap[inv.patientId];
                     final mrNum = (p?.mrNumber ?? '').toLowerCase();
                     final pName = (p?.patientName ?? '').toLowerCase();
                     final status = inv.paymentStatus.toLowerCase();

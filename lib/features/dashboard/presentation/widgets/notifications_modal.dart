@@ -26,7 +26,18 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
     DeviceNotificationService.instance.initialize();
   }
 
-  Future<void> _launchWhatsApp(String url) async {
+  Future<void> _launchWhatsApp(String? url) async {
+    if (url == null || url.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Patient's phone number is invalid or unavailable."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
     try {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
@@ -162,25 +173,62 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
               ),
               const SizedBox(height: 12),
 
-              // Modal Title & Action Bar (Optimized for Mobile Viewports)
+              // Modal Title & Action Bar (Variant C - Clean / Minimal)
               Row(
                 children: [
-                  const Icon(Icons.notifications_active_rounded, color: Color(0xFF1565C0), size: 20),
-                  const SizedBox(width: 7),
-                  const Expanded(
-                    child: Text(
-                      'Notifications',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  const Icon(Icons.notifications_active_rounded, color: Color(0xFF1565C0), size: 21),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  if ((expiringPlansAsync.asData?.value.length ?? 0) > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${expiringPlansAsync.asData!.value.length}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  IconButton(
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.close_rounded, size: 20, color: Colors.grey),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Secondary Quick Actions Sub-Bar
+              Row(
+                children: [
+                  Text(
+                    'QUICK ACTIONS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.blueGrey.shade400,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const Spacer(),
                   // Test Alert Icon Action
                   Tooltip(
                     message: 'Test Phone Alert',
@@ -206,7 +254,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                         },
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(6),
@@ -216,11 +264,11 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.phonelink_ring_rounded, size: 13, color: Colors.blue.shade700),
-                              const SizedBox(width: 3),
+                              const SizedBox(width: 4),
                               Text(
                                 'Test',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.blue.shade800,
                                 ),
@@ -231,14 +279,14 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   // + Schedule Button
                   ElevatedButton.icon(
                     onPressed: _openScheduleModal,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1565C0),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                       elevation: 0,
                       visualDensity: VisualDensity.compact,
@@ -248,14 +296,6 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                       '+ Schedule',
                       style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  // Close Button
-                  IconButton(
-                    padding: const EdgeInsets.all(4),
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.close_rounded, size: 19, color: Colors.grey),
-                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),

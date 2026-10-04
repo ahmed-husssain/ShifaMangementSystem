@@ -70,6 +70,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
   late TextEditingController _doctorController;
   late TextEditingController _nurseController;
   late TextEditingController _caretakerController;
+  late TextEditingController _staffPhoneController;
   
   // Financial fields
   late TextEditingController _patientAmountController;
@@ -95,6 +96,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
     _doctorController = TextEditingController(text: p?.doctor ?? '');
     _nurseController = TextEditingController(text: p?.nurse ?? '');
     _caretakerController = TextEditingController(text: p?.caretaker ?? '');
+    _staffPhoneController = TextEditingController(text: p?.staffPhone ?? '');
     
     _patientAmountController = TextEditingController(text: (p != null && p.patientAmount > 0) ? p.patientAmount.toString() : '');
     _staffPaymentController = TextEditingController(text: (p != null && p.staffPayment > 0) ? p.staffPayment.toString() : '');
@@ -115,6 +117,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
     _doctorController.addListener(_autoSaveDraft);
     _nurseController.addListener(_autoSaveDraft);
     _caretakerController.addListener(_autoSaveDraft);
+    _staffPhoneController.addListener(_autoSaveDraft);
     _patientAmountController.addListener(_autoSaveDraft);
     _staffPaymentController.addListener(_autoSaveDraft);
     _daysController.addListener(_autoSaveDraft);
@@ -140,6 +143,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
         if (draft.doctor.isNotEmpty) _doctorController.text = draft.doctor;
         if (draft.nurse.isNotEmpty) _nurseController.text = draft.nurse;
         if (draft.caretaker.isNotEmpty) _caretakerController.text = draft.caretaker;
+        if (draft.staffPhone.isNotEmpty) _staffPhoneController.text = draft.staffPhone;
         if (draft.patientAmount.isNotEmpty) _patientAmountController.text = draft.patientAmount;
         if (draft.staffPayment.isNotEmpty) _staffPaymentController.text = draft.staffPayment;
         if (draft.days.isNotEmpty) _daysController.text = draft.days;
@@ -161,6 +165,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
       _doctorController.clear();
       _nurseController.clear();
       _caretakerController.clear();
+      _staffPhoneController.clear();
       _patientAmountController.clear();
       _staffPaymentController.clear();
       _daysController.clear();
@@ -185,6 +190,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
       doctor: _doctorController.text.trim(),
       nurse: _nurseController.text.trim(),
       caretaker: _caretakerController.text.trim(),
+      staffPhone: _staffPhoneController.text.trim(),
       patientAmount: _patientAmountController.text.trim(),
       staffPayment: _staffPaymentController.text.trim(),
       days: _daysController.text.trim(),
@@ -216,6 +222,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
     _doctorController.dispose();
     _nurseController.dispose();
     _caretakerController.dispose();
+    _staffPhoneController.dispose();
     _patientAmountController.dispose();
     _staffPaymentController.dispose();
     _daysController.dispose();
@@ -290,6 +297,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
         doctor: _doctorController.text.trim(),
         nurse: _nurseController.text.trim(),
         caretaker: _caretakerController.text.trim(),
+        staffPhone: _staffPhoneController.text.trim(),
         selectedServices: _selectedServices,
         monthlyServiceCost: _monthlyServiceCost,
         patientAmount: double.tryParse(_patientAmountController.text) ?? 0.0,
@@ -323,6 +331,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
           doctor: patient.doctor,
           nurse: patient.nurse,
           caretaker: patient.caretaker,
+          staffPhone: patient.staffPhone,
           selectedServices: patient.selectedServices,
           monthlyServiceCost: patient.monthlyServiceCost,
           patientAmount: patient.patientAmount,
@@ -490,6 +499,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
                       _buildField(_doctorController, 'Doctor'),
                       _buildField(_nurseController, 'Nurse'),
                       _buildField(_caretakerController, 'Caretaker'),
+                      _buildField(_staffPhoneController, 'Staff Phone / WhatsApp', isPhone: true),
                     ],
                   ),
                   const SizedBox(height: 16),

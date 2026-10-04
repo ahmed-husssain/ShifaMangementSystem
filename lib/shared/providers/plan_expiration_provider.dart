@@ -74,8 +74,19 @@ class ExpiringPatientPlan {
     }
   }
 
-  String get whatsappUrl {
+  bool get hasValidPhone {
+    final clean = patient.phone.replaceAll(RegExp(r'[^\d+]'), '').trim();
+    final digitsOnly = clean.replaceAll('+', '');
+    return digitsOnly.length >= 7;
+  }
+
+  String? get whatsappUrl {
     var phone = patient.phone.replaceAll(RegExp(r'[^\d+`]'), '').trim();
+    final digitsOnly = phone.replaceAll('+', '');
+    if (digitsOnly.length < 7) {
+      return null;
+    }
+
     if (phone.startsWith('0')) {
       phone = '92${phone.substring(1)}';
     } else if (phone.startsWith('+')) {
@@ -137,9 +148,15 @@ List<ExpiringPatientPlan> calculateExpiringPlans({
   // 1A. Process standalone scheduled_notifications collection
   for (final rem in standaloneScheduled) {
     if (rem.isCompleted) continue;
-    if (rem.id.isNotEmpty) processedIds.add(rem.id);
 
     final patientMatches = patients.where((p) => p.patientId == rem.patientId).toList();
+    if (patientMatches.isNotEmpty) {
+      final p = patientMatches.first;
+      if (p.isDiscontinued || p.isDeleted) continue;
+    }
+
+    if (rem.id.isNotEmpty) processedIds.add(rem.id);
+
     final patient = patientMatches.isNotEmpty
         ? patientMatches.first
         : Patient(
@@ -153,6 +170,7 @@ List<ExpiringPatientPlan> calculateExpiringPlans({
             doctor: '',
             nurse: '',
             caretaker: '',
+            staffPhone: '',
             selectedServices: const [],
             monthlyServiceCost: 0,
             patientAmount: 0,

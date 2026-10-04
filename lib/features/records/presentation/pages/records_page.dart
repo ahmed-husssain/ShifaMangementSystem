@@ -1065,6 +1065,8 @@ class _PatientDetailsModal extends ConsumerWidget {
           _buildDetailRow(context, 'Doctor', patient.doctor),
           _buildDetailRow(context, 'Nurse', patient.nurse),
           _buildDetailRow(context, 'Caretaker', patient.caretaker),
+          if (patient.staffPhone.isNotEmpty)
+            _buildDetailRow(context, 'Staff Phone', patient.staffPhone),
           const SizedBox(height: 16),
           Text(
             'Registration Info',

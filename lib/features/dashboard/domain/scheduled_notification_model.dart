@@ -69,19 +69,35 @@ class ScheduledNotification {
 
     final parsedId = (docId.isNotEmpty ? docId : (map['id'] ?? '')).toString();
 
+    String patientName = (map['patientName'] ?? map['patient_name'] ?? '').toString();
+    String mrNumber = (map['mrNumber'] ?? map['mr_number'] ?? '').toString();
+    final message = (map['message'] ?? '').toString();
+    if (patientName.isEmpty && message.isNotEmpty) {
+      final nameMatch = RegExp(r'Patient:\s*([^(]+)').firstMatch(message);
+      if (nameMatch != null) {
+        patientName = nameMatch.group(1)!.trim();
+      }
+    }
+    if (mrNumber.isEmpty && message.isNotEmpty) {
+      final mrMatch = RegExp(r'\(([^)]+)\)').firstMatch(message);
+      if (mrMatch != null) {
+        mrNumber = mrMatch.group(1)!.trim();
+      }
+    }
+
     return ScheduledNotification(
       id: parsedId,
-      patientId: (map['patientId'] ?? '').toString(),
-      patientName: (map['patientName'] ?? '').toString(),
-      mrNumber: (map['mrNumber'] ?? '').toString(),
+      patientId: (map['patientId'] ?? map['patient_id'] ?? '').toString(),
+      patientName: patientName,
+      mrNumber: mrNumber,
       phone: (map['phone'] ?? '').toString(),
       address: (map['address'] ?? '').toString(),
-      reminderNote: (map['reminderNote'] ?? '').toString(),
+      reminderNote: (map['reminderNote'] ?? map['title'] ?? '').toString(),
       targetDays: map['targetDays'] != null ? (int.tryParse(map['targetDays'].toString()) ?? 0) : 0,
-      scheduledFor: parseDate(map['scheduledFor']),
-      createdAt: parseDate(map['createdAt']),
-      createdBy: (map['createdBy'] ?? '').toString(),
-      isCompleted: map['isCompleted'] == true,
+      scheduledFor: parseDate(map['scheduledFor'] ?? map['scheduled_time']),
+      createdAt: parseDate(map['createdAt'] ?? map['created_at']),
+      createdBy: (map['createdBy'] ?? map['created_by'] ?? '').toString(),
+      isCompleted: map['isCompleted'] == true || map['is_sent'] == true,
     );
   }
 }

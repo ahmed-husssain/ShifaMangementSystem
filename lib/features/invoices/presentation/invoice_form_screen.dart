@@ -103,7 +103,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         _checkAndRestoreDraft();
       });
     }
-    _generateInvoiceNumber();
   }
 
   void _checkAndRestoreDraft() {
@@ -162,7 +161,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       _draftRestored = false;
       _continuityNote = null;
     });
-    _generateInvoiceNumber();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Invoice draft cleared.')),
     );
@@ -196,36 +194,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     }
     _itemDaysControllers.clear();
     super.dispose();
-  }
-
-  Future<void> _generateInvoiceNumber() async {
-    try {
-      final snap = await Supabase.instance.client
-          .from('invoices')
-          .select('invoice_number');
-
-      int highest = 4999;
-      for (final doc in snap) {
-        final existingNum = (doc['invoice_number'] ?? doc['invoiceNumber']) as String? ?? '';
-        final parsed = int.tryParse(existingNum.replaceAll(RegExp(r'[^0-9]'), ''));
-        if (parsed != null && parsed > highest) {
-          highest = parsed;
-        }
-      }
-
-      int nextNumber = highest + 1;
-      if (nextNumber < 5000) {
-        nextNumber = 5000;
-      }
-
-      setState(() {
-        _invoiceNumber = 'SHHC-$nextNumber';
-      });
-    } catch (_) {
-      setState(() {
-        _invoiceNumber = 'SHHC-5000';
-      });
-    }
   }
 
   Future<void> _loadPatient() async {
@@ -506,7 +474,10 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   }
 
   double get _subtotal => _items.fold(0.0, (acc, item) => acc + item.total);
-  double get _grandTotal => _subtotal - _discount;
+  double get _grandTotal {
+    final total = _subtotal - _discount;
+    return total < 0 ? 0.0 : total;
+  }
 
   Future<void> _submit(String format) async {
     if (_isLoading) return;
@@ -515,6 +486,40 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         const SnackBar(content: Text('Please add at least one item')),
       );
       return;
+    }
+
+    final fromDateNormalized = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+    final toDateNormalized = DateTime(_toDate.year, _toDate.month, _toDate.day);
+    if (toDateNormalized.isBefore(fromDateNormalized)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('To date cannot be earlier than From date.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_discount < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Discount cannot be negative.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    for (final item in _items) {
+      if (item.quantity < 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Item quantity must be at least 1.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
     }
 
     final mrNum = _mrNumberController.text.trim();
@@ -642,7 +647,9 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         days: invoiceDays,
       );
 
-      final newDocId = await repo.createInvoice(invoice, userName: userName);
+      final creationResult = await repo.createInvoice(invoice, userName: userName);
+      final newDocId = creationResult.id;
+      final assignedNumber = creationResult.invoiceNumber;
       ref.read(invoiceFormDraftProvider.notifier).clearDraft();
       ref.invalidate(allInvoicesProvider(false));
       ref.invalidate(allInvoicesProvider(true));
@@ -651,7 +658,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
       final savedInvoice = Invoice(
         invoiceId: newDocId,
-        invoiceNumber: _invoiceNumber ?? (invoice.invoiceNumber != 'N/A' ? invoice.invoiceNumber : 'SHHC-5000'),
+        invoiceNumber: assignedNumber,
         patientId: _patient!.patientId,
         staffId: user.uid,
         subtotal: _subtotal,
@@ -814,29 +821,35 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       setState(() {
         if (isFrom) {
           _fromDate = picked;
-          if (_toDate.isBefore(_fromDate)) {
-            _toDate = _fromDate.add(Duration(days: _days > 0 ? _days : 1));
-          }
         } else {
           _toDate = picked;
-          if (_toDate.isBefore(_fromDate)) {
-            _fromDate = _toDate;
-          }
         }
 
-        final calculatedDays = _calculateDaysBetween(_fromDate, _toDate);
-        _days = calculatedDays;
-        _continuityNote = null;
+        final fromDateOnly = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+        final toDateOnly = DateTime(_toDate.year, _toDate.month, _toDate.day);
 
-        for (int i = 0; i < _items.length; i++) {
-          _items[i] = InvoiceItem(
-            serviceName: _items[i].serviceName,
-            price: _items[i].price,
-            quantity: calculatedDays,
+        if (toDateOnly.isBefore(fromDateOnly)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('To date cannot be earlier than From date.'),
+              backgroundColor: Colors.red,
+            ),
           );
-        }
-        for (final c in _itemDaysControllers) {
-          c.text = calculatedDays.toString();
+        } else {
+          final calculatedDays = _calculateDaysBetween(_fromDate, _toDate);
+          _days = calculatedDays;
+          _continuityNote = null;
+
+          for (int i = 0; i < _items.length; i++) {
+            _items[i] = InvoiceItem(
+              serviceName: _items[i].serviceName,
+              price: _items[i].price,
+              quantity: calculatedDays,
+            );
+          }
+          for (final c in _itemDaysControllers) {
+            c.text = calculatedDays.toString();
+          }
         }
       });
       _autoSaveDraft();
@@ -930,7 +943,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                     child: Column(
                       children: [
                         InvoiceHeaderSection(
-                          invoiceNumber: _invoiceNumber ?? '...',
+                          invoiceNumber: _invoiceNumber ?? 'Auto-assigned on save',
                           fromDate: _fromDate,
                           toDate: _toDate,
                           paymentStatus: _paymentStatus,

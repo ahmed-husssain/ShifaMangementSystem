@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/invoice_model.dart';
+import '../domain/invoice_creation_result.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../patients/data/patient_repository.dart';
 
@@ -86,33 +87,47 @@ class InvoiceRepository {
         });
   }
 
-  Future<String> createInvoice(Invoice invoice, {String? userName}) async {
-    final invoiceId = invoice.invoiceId.isNotEmpty
-        ? invoice.invoiceId
-        : DateTime.now().millisecondsSinceEpoch.toString();
+  void _validateInvoice(Invoice invoice) {
+    if (invoice.fromDate != null && invoice.toDate != null) {
+      if (invoice.toDate!.isBefore(invoice.fromDate!)) {
+        throw ArgumentError('To date cannot be earlier than From date.');
+      }
+    }
+    if (invoice.discount < 0) {
+      throw ArgumentError('Discount cannot be negative.');
+    }
+    for (final item in invoice.items) {
+      if (item.quantity < 1) {
+        throw ArgumentError('Item quantity must be at least 1.');
+      }
+    }
+  }
 
-    final invMap = invoice.toSupabaseMap();
-    invMap['id'] = invoiceId;
+  Future<InvoiceCreationResult> createInvoice(
+    Invoice invoice, {
+    String? userName,
+    String? idempotencyKey,
+  }) async {
+    _validateInvoice(invoice);
 
-    await _supabase.from('invoices').insert(invMap);
+    final payload = invoice.toSupabaseMap();
+    if (invoice.invoiceId.isNotEmpty) {
+      payload['id'] = invoice.invoiceId;
+    }
+    final key = idempotencyKey ??
+        'inv_${DateTime.now().microsecondsSinceEpoch}_${invoice.patientId}';
+    payload['idempotency_key'] = key;
 
-    // Log activity
-    await _supabase.from('activities').insert({
-      'user_id': invoice.createdBy,
-      'user_name': (userName != null && userName.isNotEmpty) ? userName : (invoice.createdByName ?? 'Staff User'),
-      'role': invoice.createdByRole ?? 'staff',
-      'action': 'INVOICE_CREATED',
-      'entity_type': 'invoice',
-      'entity_id': invoiceId,
-      'description': 'Created invoice ${invoice.invoiceNumber} for amount PKR ${invoice.grandTotal.toStringAsFixed(0)}',
-      'organization_id': invoice.organizationId,
-      'timestamp': DateTime.now().toIso8601String(),
+    final response = await _supabase.rpc('create_invoice_atomic', params: {
+      'invoice_payload': payload,
     });
 
-    return invoiceId;
+    final data = Map<String, dynamic>.from(response as Map);
+    return InvoiceCreationResult.fromMap(data);
   }
 
   Future<void> updateInvoice(Invoice invoice, {String? previousPaymentStatus}) async {
+    _validateInvoice(invoice);
     await _supabase
         .from('invoices')
         .update(invoice.toSupabaseMap())
