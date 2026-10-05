@@ -140,6 +140,8 @@ List<ExpiringPatientPlan> calculateExpiringPlans({
   required List<Invoice> invoices,
   required List<ScheduledNotification> standaloneScheduled,
   required DateTime now,
+  String role = 'admin',
+  Set<String>? currentStaffIdentifiers,
 }) {
   final List<ExpiringPatientPlan> expiringList = [];
   final Set<String> processedIds = {};
@@ -153,6 +155,18 @@ List<ExpiringPatientPlan> calculateExpiringPlans({
     if (patientMatches.isNotEmpty) {
       final p = patientMatches.first;
       if (p.isDiscontinued || p.isDeleted) continue;
+    }
+
+    // Role-based staff scoping:
+    // If the logged-in user is staff (not admin), they should ONLY see notifications:
+    // 1. Linked to their assigned patient (patientMatches.isNotEmpty), OR
+    // 2. Explicitly created by them (rem.createdBy matches currentStaffIdentifiers)
+    if (role != 'admin') {
+      final isCreator = currentStaffIdentifiers != null &&
+          matchesStaffIdentifier(rem.createdBy, currentStaffIdentifiers);
+      if (patientMatches.isEmpty && !isCreator) {
+        continue; // Skip: belongs to another staff member!
+      }
     }
 
     if (rem.id.isNotEmpty) processedIds.add(rem.id);
@@ -346,6 +360,7 @@ final dismissedNotificationsProvider = NotifierProvider<DismissedNotificationsNo
 final expiringPlansProvider = StreamProvider<List<ExpiringPatientPlan>>((ref) {
   final profile = ref.watch(userProfileProvider).value;
   final role = profile?['role'] ?? 'staff';
+  final currentStaffIdentifiers = ref.watch(currentStaffIdentifiersProvider);
 
   final patientsAsync = role == 'admin'
       ? ref.watch(allPatientsProvider(false))
@@ -367,6 +382,8 @@ final expiringPlansProvider = StreamProvider<List<ExpiringPatientPlan>>((ref) {
     invoices: invoices,
     standaloneScheduled: standaloneScheduled,
     now: DateTime.now(),
+    role: role,
+    currentStaffIdentifiers: currentStaffIdentifiers,
   );
 
   final activeList = expiringList.where((p) => !dismissedIds.contains(p.id)).toList();

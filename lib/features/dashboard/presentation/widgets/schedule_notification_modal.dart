@@ -111,6 +111,7 @@ class _ScheduleNotificationModalState extends ConsumerState<ScheduleNotification
       if (mounted) {
         ref.invalidate(allPatientsProvider(false));
         ref.invalidate(staffPatientsProvider);
+        ref.invalidate(activeScheduledNotificationsProvider);
         ref.invalidate(expiringPlansProvider);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -217,8 +218,11 @@ class AuthController {
       }
     }
 
+    debugPrint('[AUTH] Attempting login: input="$clean", email="$email"');
+
     try {
       final res = await supabase.auth.signInWithPassword(email: email, password: password);
+      debugPrint('[AUTH] signInWithPassword succeeded for user: ${res.user?.id}');
       if (res.user != null) {
         try {
           final profile = await supabase.from('users').select().eq('id', res.user!.id).maybeSingle();
@@ -239,13 +243,20 @@ class AuthController {
         }
       }
     } on AuthException catch (e) {
+      debugPrint('[AUTH] AuthException caught: statusCode=${e.statusCode}, message="${e.message}"');
       if (e.message.toLowerCase().contains('banned') || e.message.toLowerCase().contains('disabled')) {
         ref?.read(loginErrorMessageProvider.notifier).setMessage(
           'Your account has been deactivated. Please contact an administrator.',
         );
         throw Exception('Your account has been deactivated. Please contact an administrator.');
       }
-      throw Exception('Incorrect username or password. Please try again.');
+      // If it's a real invalid credential, display the standard message. Otherwise, display the actual system error.
+      if (e.message.toLowerCase().contains('invalid login credentials') ||
+          e.message.toLowerCase().contains('invalid credentials') ||
+          e.message.toLowerCase().contains('user not found')) {
+        throw Exception('Incorrect username or password. Please try again.');
+      }
+      throw Exception('Login error: ${e.message} (status: ${e.statusCode})');
     }
   }
 
