@@ -17,6 +17,7 @@ final activeScheduledNotificationsProvider = StreamProvider<List<ScheduledNotifi
   return supabase
       .from('scheduled_notifications')
       .stream(primaryKey: ['id'])
+      .order('scheduled_time', ascending: true)
       .map((rows) {
         return rows
             .map((doc) => ScheduledNotification.fromMap(doc, (doc['id'] ?? '').toString()))

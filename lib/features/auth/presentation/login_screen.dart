@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../core/errors/app_error.dart';
+import '../../../core/config/supabase_config.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -126,6 +127,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     letterSpacing: 0.5,
                   ),
                 ),
+                if (SupabaseConfig.isStaging) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7), // Amber 100
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFD97706)), // Amber 600
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.science_outlined, size: 14, color: Color(0xFFB45309)),
+                        SizedBox(width: 5),
+                        Text(
+                          'TEST DATABASE (STAGING)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFB45309),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 // Subtitle
                 const Text(

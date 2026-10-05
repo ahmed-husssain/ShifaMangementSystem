@@ -69,3 +69,5 @@ functions/node_modules/
 *.sha1
 *.idsig
 *.secret*
+
+*.sql
