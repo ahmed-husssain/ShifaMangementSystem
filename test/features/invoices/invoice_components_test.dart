@@ -73,6 +73,50 @@ void main() {
     expect(find.text('15,000'), findsOneWidget);
   });
 
+  testWidgets('InvoiceItemsTable allows custom service name inline editing without layout break on mobile', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    String updatedName = '';
+    final items = [
+      InvoiceItem(serviceName: 'Custom Service', price: 1500.0, quantity: 3),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: InvoiceItemsTable(
+              items: items,
+              isEditable: true,
+              onUpdateItem: (idx, {name, price, qty}) {
+                if (name != null) updatedName = name;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Should find the custom name text field
+    expect(find.text('Type service name...'), findsOneWidget);
+
+    // Type a custom name
+    await tester.enterText(find.byKey(const ValueKey('custom_name_0')), 'Special Wound Dressing');
+    expect(updatedName, 'Special Wound Dressing');
+
+    // Switch back to standard dropdown via arrow
+    await tester.tap(find.byIcon(Icons.arrow_drop_down));
+    await tester.pumpAndSettle();
+
+    // Now dropdown is visible
+    expect(find.byType(DropdownButton<String>), findsOneWidget);
+  });
+
   testWidgets('InvoiceTotalsSummary renders correct totals and status', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
