@@ -8,10 +8,17 @@ import 'shared/providers/presence_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
-  );
+  if (SupabaseConfig.isConfigured) {
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      anonKey: SupabaseConfig.anonKey,
+    );
+  } else {
+    debugPrint(
+      '⚠️ [SupabaseConfig] No Supabase credentials configured.\n'
+      'Pass credentials via --dart-define or --dart-define-from-file=.env',
+    );
+  }
 
   runApp(const ProviderScope(child: ShifaApp()));
 }
