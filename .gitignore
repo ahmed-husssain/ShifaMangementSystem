@@ -58,6 +58,7 @@ backups/
 *.mp4
 *.env
 *.env.*
+!.env.example
 *.real.dart
 lib/firebase_options*.dart
 *HomeHealthCare.mp4

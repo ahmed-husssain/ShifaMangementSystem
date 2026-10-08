@@ -1,40 +1,48 @@
 import 'package:flutter/foundation.dart';
 
 enum Environment {
-  staging,    // Temporary / Testing Database (REDACTED_PROJECT_ID)
-  production, // Main / Real Patient Database (REDACTED_PROJECT_ID)
+  staging,
+  production,
 }
 
+/// Secure Supabase runtime & build configuration.
+/// 
+/// Credentials are read dynamically from compile-time environment variables
+/// (e.g. `--dart-define=SUPABASE_URL=...` or `--dart-define-from-file=.env`).
+/// No live secrets are hardcoded in the codebase.
 class SupabaseConfig {
-  // =========================================================================
-  // ENVIRONMENT CONFIGURATION:
-  //
-  // 🔘 OPTION 1 (MANUAL TOGGLE):
-  //    Change `currentEnvironment` below to switch databases anytime.
-  //
-  // 🔘 OPTION 2 (AUTOMATIC):
-  //    Set `useAutomaticSwitch = true`.
-  //    - Debug mode (flutter run) ➔ Automatically connects to STAGING (Test DB)
-  //    - Release mode (APK build)  ➔ Automatically connects to PRODUCTION (Live DB)
-  // =========================================================================
-
-  /// Set to true to automatically use Production on APK builds and Staging during development
-  static const bool useAutomaticSwitch = false;
+  /// Toggle to automatically switch between staging and production based on build mode
+  static const bool useAutomaticSwitch = bool.fromEnvironment(
+    'SUPABASE_AUTO_SWITCH',
+    defaultValue: false,
+  );
 
   /// Manual selection: Change between Environment.staging and Environment.production
   static const Environment currentEnvironment = Environment.production;
 
   // -------------------------------------------------------------------------
-  // 1. STAGING / TEMPORARY TEST DATABASE CREDENTIALS (REDACTED_PROJECT_ID)
+  // 1. STAGING CREDENTIALS (Injected via environment or .env)
   // -------------------------------------------------------------------------
-  static const String _stagingUrl = 'https://staging.supabase.co';
-  static const String _stagingAnonKey = 'sb_publishable_REDACTED';
+  static const String _stagingUrl = String.fromEnvironment(
+    'SUPABASE_STAGING_URL',
+    defaultValue: String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
+  );
+  static const String _stagingAnonKey = String.fromEnvironment(
+    'SUPABASE_STAGING_ANON_KEY',
+    defaultValue: String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
+  );
 
   // -------------------------------------------------------------------------
-  // 2. PRODUCTION / REAL PATIENT DATABASE CREDENTIALS (REDACTED_PROJECT_ID)
+  // 2. PRODUCTION CREDENTIALS (Injected via environment or .env)
   // -------------------------------------------------------------------------
-  static const String _prodUrl = 'https://production.supabase.co';
-  static const String _prodAnonKey = 'sb_publishable_REDACTED';
+  static const String _prodUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: '',
+  );
+  static const String _prodAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: '',
+  );
 
   // -------------------------------------------------------------------------
   // RESOLVERS
@@ -51,6 +59,11 @@ class SupabaseConfig {
 
   static String get url => isProduction ? _prodUrl : _stagingUrl;
   static String get anonKey => isProduction ? _prodAnonKey : _stagingAnonKey;
+
+  static bool get isConfigured =>
+      url.trim().isNotEmpty &&
+      anonKey.trim().isNotEmpty &&
+      !anonKey.contains('PLACEHOLDER');
 
   static String get environmentName =>
       isProduction ? 'PRODUCTION (LIVE)' : 'STAGING (TEST DATABASE)';
