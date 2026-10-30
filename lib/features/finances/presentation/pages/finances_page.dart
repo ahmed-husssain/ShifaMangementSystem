@@ -206,18 +206,14 @@ class FinancesPage extends ConsumerWidget {
         final invoices = invoicesAsync.value ?? [];
         final patientMap = {for (final p in activePatients) p.patientId: p};
 
-        double totalRevenue = 0;
         double totalPayout = 0;
-        double totalProfit = 0;
 
-        // Calculate Revenue and Staff Expenditure strictly from this staff member's active managed patients
+        // Calculate Staff Expenditure strictly from this staff member's active managed patients
         if (activePatients.isNotEmpty) {
           for (final inv in invoices) {
             if (!inv.isDiscontinued && !inv.isDeleted) {
               final patient = patientMap[inv.patientId];
               if (patient == null) continue;
-
-              totalRevenue += inv.grandTotal;
 
               double staffDailyRate = 0.0;
               if (patient.staffPayment > 0) {
@@ -237,8 +233,6 @@ class FinancesPage extends ConsumerWidget {
               totalPayout += invoiceDays * staffDailyRate;
             }
           }
-
-          totalProfit = totalRevenue - totalPayout;
         }
 
         final formatter = NumberFormat('#,###');
@@ -260,23 +254,23 @@ class FinancesPage extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
 
-              // Metric Cards Stack
+              // Staff Metric Cards Stack (Confidential margins protected)
               _buildMetricCard(
-                label: 'TOTAL REVENUE (PATIENT INTAKE)',
-                value: 'Rs. ${formatter.format(totalRevenue.toInt())}',
+                label: 'ASSIGNED PATIENTS',
+                value: '${activePatients.length} Active',
                 accentColor: const Color(0xFF2563EB),
               ),
               const SizedBox(height: 14),
               _buildMetricCard(
-                label: 'STAFF EXPENDITURE (PAYOUTS)',
+                label: 'TOTAL STAFF EARNINGS',
                 value: 'Rs. ${formatter.format(totalPayout.toInt())}',
-                accentColor: const Color(0xFFDC2626),
+                accentColor: const Color(0xFF16A34A),
               ),
               const SizedBox(height: 14),
               _buildMetricCard(
-                label: 'NET OPERATIONAL MARGIN',
-                value: 'Rs. ${formatter.format(totalProfit.toInt())}',
-                accentColor: const Color(0xFF16A34A),
+                label: 'INVOICES PROCESSED',
+                value: '${invoices.length}',
+                accentColor: const Color(0xFF0D9488),
               ),
               const SizedBox(height: 28),
 
@@ -345,7 +339,7 @@ class FinancesPage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -407,7 +401,7 @@ class FinancesPage extends ConsumerWidget {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -425,53 +419,56 @@ class FinancesPage extends ConsumerWidget {
               headingRowHeight: 48,
               dataRowMinHeight: 52,
               dataRowMaxHeight: 56,
-              columns: [
-                DataColumn(
-                  label: Text(
-                    'PATIENT NAME',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'REVENUE (IN)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    isAdmin ? 'PAYOUT (OUT)' : 'EARNINGS (OUT)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'NET YIELD',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
+              columns: isAdmin
+                  ? [
+                      _buildHeaderCol('PATIENT NAME'),
+                      _buildHeaderCol('REVENUE (IN)'),
+                      _buildHeaderCol('PAYOUT (OUT)'),
+                      _buildHeaderCol('NET YIELD'),
+                    ]
+                  : [
+                      _buildHeaderCol('PATIENT NAME'),
+                      _buildHeaderCol('CARE DURATION'),
+                      _buildHeaderCol('YOUR EARNINGS'),
+                    ],
               rows: patients.map((p) {
+                if (!isAdmin) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Text(
+                          p.patientName.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          p.days > 0 ? '${p.days} Days' : '30 Days',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          'Rs. ${formatter.format(p.staffPayment.toInt())}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
                 return DataRow(
                   cells: [
                     DataCell(
@@ -519,6 +516,20 @@ class FinancesPage extends ConsumerWidget {
               }).toList(),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  static DataColumn _buildHeaderCol(String title) {
+    return DataColumn(
+      label: Text(
+        title,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue.shade900,
+          letterSpacing: 0.5,
         ),
       ),
     );

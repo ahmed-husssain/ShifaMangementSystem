@@ -1,0 +1,47 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Clinic bank account configuration for invoicing & payments.
+class BankDetails {
+  final String bankName;
+  final String accountTitle;
+  final String accountNumber;
+  final String iban;
+
+  const BankDetails({
+    required this.bankName,
+    required this.accountTitle,
+    required this.accountNumber,
+    required this.iban,
+  });
+
+  /// Default bank details with dynamic compile-time environment overrides
+  static const defaultDetails = BankDetails(
+    bankName: String.fromEnvironment('CLINIC_BANK_NAME', defaultValue: 'Meezan Bank'),
+    accountTitle: String.fromEnvironment('CLINIC_ACCOUNT_TITLE', defaultValue: 'SHIFA HOME HEALTH CARE'),
+    accountNumber: String.fromEnvironment('CLINIC_ACCOUNT_NO', defaultValue: '10270115184708'),
+    iban: String.fromEnvironment('CLINIC_IBAN', defaultValue: 'PK23MEZN0010270115184708'),
+  );
+
+  factory BankDetails.fromMap(Map<String, dynamic> map) {
+    return BankDetails(
+      bankName: map['bank_name']?.toString() ?? defaultDetails.bankName,
+      accountTitle: map['account_title']?.toString() ?? defaultDetails.accountTitle,
+      accountNumber: map['account_number']?.toString() ?? defaultDetails.accountNumber,
+      iban: map['iban']?.toString() ?? defaultDetails.iban,
+    );
+  }
+
+  Map<String, String> toMap() {
+    return {
+      'bank_name': bankName,
+      'account_title': accountTitle,
+      'account_number': accountNumber,
+      'iban': iban,
+    };
+  }
+}
+
+/// Provider for dynamic clinic bank details
+final clinicBankDetailsProvider = Provider<BankDetails>((ref) {
+  return BankDetails.defaultDetails;
+});

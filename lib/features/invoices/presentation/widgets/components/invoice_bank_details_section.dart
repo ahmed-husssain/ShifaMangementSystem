@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:shifa_management/core/config/bank_details.dart';
 
 class InvoiceBankDetailsSection extends StatelessWidget {
-  const InvoiceBankDetailsSection({super.key});
+  final BankDetails? bankDetails;
+
+  const InvoiceBankDetailsSection({super.key, this.bankDetails});
 
   @override
   Widget build(BuildContext context) {
+    final details = bankDetails ?? BankDetails.defaultDetails;
+
     return SizedBox(
       width: 320,
       child: Container(
@@ -21,10 +26,10 @@ class InvoiceBankDetailsSection extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
             const SizedBox(height: 8),
-            _bankDetailRow('Bank:', 'Meezan Bank'),
-            _bankDetailRow('Title:', 'SHIFA HOME HEALTH CARE'),
-            _bankDetailRow('A/C #:', '10270115184708'),
-            _bankDetailRow('IBAN:', 'PK23MEZN0010270115184708'),
+            _bankDetailRow('Bank:', details.bankName),
+            _bankDetailRow('Title:', details.accountTitle),
+            _bankDetailRow('A/C #:', details.accountNumber),
+            _bankDetailRow('IBAN:', details.iban),
           ],
         ),
       ),

@@ -10,14 +10,17 @@ import 'package:printing/printing.dart';
 import '../domain/invoice_model.dart';
 import '../../patients/domain/patient_model.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/bank_details.dart';
 
 class InvoiceExporter {
   static Future<Uint8List> generatePdf(
     Invoice invoice, {
     Patient? patient,
     String? invoiceNumber,
+    BankDetails? bankDetails,
   }) async {
     final pdf = pw.Document();
+    final bank = bankDetails ?? BankDetails.defaultDetails;
 
     if (patient == null && invoice.patientId.isNotEmpty) {
       try {
@@ -402,10 +405,10 @@ class InvoiceExporter {
                               color: const PdfColor.fromInt(0xFFE2E8F0),
                             ),
                             pw.SizedBox(height: 6),
-                            _bankRow('BANK:', 'Meezan Bank'),
-                            _bankRow('TITLE:', 'SHIFA HOME HEALTH CARE'),
-                            _bankRow('A/C #:', '10270115184708'),
-                            _bankRow('IBAN:', 'PK23MEZN0010270115184708')
+                            _bankRow('BANK:', bank.bankName),
+                            _bankRow('TITLE:', bank.accountTitle),
+                            _bankRow('A/C #:', bank.accountNumber),
+                            _bankRow('IBAN:', bank.iban)
                           ],
                         ),
                       ),
@@ -619,11 +622,13 @@ class InvoiceExporter {
     Patient? patient,
     String? invoiceNumber,
     bool isPng = true,
+    BankDetails? bankDetails,
   }) async {
     final pdfBytes = await generatePdf(
       invoice,
       patient: patient,
       invoiceNumber: invoiceNumber,
+      bankDetails: bankDetails,
     );
     await for (final page in Printing.raster(pdfBytes, pages: [0], dpi: 300)) {
       return await page.toPng();
