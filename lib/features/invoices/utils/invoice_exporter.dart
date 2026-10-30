@@ -92,11 +92,11 @@ class InvoiceExporter {
                     pw.Padding(
                       padding: const pw.EdgeInsets.only(left: 4),
                       child: pw.Text(
-                        'Your Health, Our Mission',
+                        'Compassionate In-Home Nursing & Care',
                         style: pw.TextStyle(
                           fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
-                          color: const PdfColor.fromInt(0xFF1565C0),
+                          color: const PdfColor.fromInt(0xFF047857),
                         ),
                       ),
                     ),
@@ -694,11 +694,11 @@ class InvoiceExporter {
       if (savedToDownloads || savedToGallery) {
         String msg;
         if (savedToGallery && savedToDownloads) {
-          msg = '✓ Saved $cleanFileName to Photos Gallery & Downloads (ShifaInvoices)';
+          msg = '✓ Saved $cleanFileName to Photos Gallery & Downloads (AlShifaInvoices)';
         } else if (savedToGallery) {
-          msg = '✓ Saved $cleanFileName to Photos Gallery (ShifaInvoices)';
+          msg = '✓ Saved $cleanFileName to Photos Gallery (AlShifaInvoices)';
         } else {
-          msg = '✓ Saved $cleanFileName to Downloads folder (ShifaInvoices)';
+          msg = '✓ Saved $cleanFileName to Downloads folder (AlShifaInvoices)';
         }
         return InvoiceSaveResult(
           success: true,

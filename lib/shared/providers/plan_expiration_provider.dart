@@ -110,24 +110,24 @@ class ExpiringPatientPlan {
     if (scheduledNotification != null) {
       msg =
           "Dear ${patient.patientName},\n\n"
-          "Your Shifa Home Health Care service plan for ($serviceText) is scheduled for renewal on $dateText.$noteText\n\n"
-          "Please pay your bill or contact us at Shifa Home Health Care to confirm your service renewal. Thank you!";
+          "Your Al-Shifa Home Nursing service plan for ($serviceText) is scheduled for renewal on $dateText.$noteText\n\n"
+          "Please settle your invoice or contact our care coordination desk at Al-Shifa Home Nursing to confirm your renewal. Thank you!";
     } else if (category == 'expired') {
       msg =
           "Dear ${patient.patientName},\n\n"
-          "Your Shifa Home Health Care service plan for ($serviceText) expired on $dateText.\n\n"
-          "Please clear your invoice and contact us at Shifa Home Health Care to confirm your service renewal and ensure uninterrupted care. Thank you!";
+          "Your Al-Shifa Home Nursing service plan for ($serviceText) expired on $dateText.\n\n"
+          "Please settle your invoice and contact our care coordination desk at Al-Shifa Home Nursing to confirm your service renewal and ensure uninterrupted care. Thank you!";
     } else if (category == 'today') {
       msg =
           "Dear ${patient.patientName},\n\n"
-          "This is a reminder that your Shifa Home Health Care service plan for ($serviceText) ends today ($dateText).\n\n"
-          "Please clear your invoice or contact us at Shifa Home Health Care to confirm continuation of your services. Thank you!";
+          "This is a reminder that your Al-Shifa Home Nursing service plan for ($serviceText) ends today ($dateText).\n\n"
+          "Please settle your invoice or contact our care coordination desk at Al-Shifa Home Nursing to confirm continuation of your care. Thank you!";
     } else {
       final days = calendarDaysRemaining > 0 ? calendarDaysRemaining : (hoursRemaining / 24).ceil();
       msg =
           "Dear ${patient.patientName},\n\n"
-          "Friendly reminder that your Shifa Home Health Care service plan for ($serviceText) is scheduled for renewal in $days days on $dateText.\n\n"
-          "Please contact us at Shifa Home Health Care to confirm your upcoming cycle. Thank you!";
+          "Friendly reminder that your Al-Shifa Home Nursing service plan for ($serviceText) is scheduled for renewal in $days days on $dateText.\n\n"
+          "Please contact our care coordination desk at Al-Shifa Home Nursing to confirm your upcoming cycle. Thank you!";
     }
 
     return 'https://wa.me/$phone?text=${Uri.encodeComponent(msg)}';

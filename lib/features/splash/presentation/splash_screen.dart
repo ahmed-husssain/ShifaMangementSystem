@@ -79,33 +79,58 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.asset(
-                        'assets/ShifaLogo.jpeg',
-                        width: 150,
-                        height: 150,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 150,
-                          height: 150,
-                          color: const Color(0xFF0056B3),
-                          child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 70),
+                    Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF047857).withValues(alpha: 0.12),
+                            blurRadius: 28,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/ShifaLogo.jpeg',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: const Color(0xFF047857),
+                            child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 64),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'SHHC Management System',
+                      'AL-SHIFA HOME NURSING',
                       style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueAccent,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: 0.6,
                       ),
                     ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'الشفاء للرعاية التمريضية المنزلية',
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF047857),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
                     const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF047857)),
                     ),
                   ],
                 ),

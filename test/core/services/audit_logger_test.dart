@@ -9,9 +9,10 @@ void main() {
     });
 
     test('AuditLogger parameter sanitization defaults', () {
-      // Simulating effective user and role resolution logic
-      final effectiveUserId = null ?? 'system';
-      final effectiveRole = null ?? 'staff';
+      const String? rawUserId = null;
+      const String? rawRole = null;
+      final effectiveUserId = rawUserId ?? 'system';
+      final effectiveRole = rawRole ?? 'staff';
       final userName = (''.isNotEmpty) ? '' : 'User';
 
       expect(effectiveUserId, equals('system'));

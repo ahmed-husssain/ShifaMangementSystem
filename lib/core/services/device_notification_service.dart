@@ -157,12 +157,12 @@ class DeviceNotificationService {
         channelDescription: channelDescription,
         importance: Importance.max,
         priority: Priority.high,
-        ticker: 'Shifa Alert Test',
+        ticker: 'Al-Shifa Care Alert',
         enableVibration: true,
         playSound: true,
         icon: '@mipmap/ic_launcher',
         largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-        color: Color(0xFF0056B3),
+        color: Color(0xFF047857),
         actions: <AndroidNotificationAction>[
           AndroidNotificationAction('test_ok', '✓ Confirmed', showsUserInterface: true),
         ],
@@ -175,8 +175,8 @@ class DeviceNotificationService {
 
       await _notificationsPlugin.show(
         id: 999999,
-        title: '🔔 Shifa Alert: Phone Notifications Active',
-        body: 'Lock-screen alerts for expiring patient plans and renewals are working fine!',
+        title: '🔔 Al-Shifa Alert: Notifications Active',
+        body: 'Alerts for expiring patient plans and renewals are working fine!',
         notificationDetails: details,
         payload: jsonEncode({'type': 'test'}),
       );

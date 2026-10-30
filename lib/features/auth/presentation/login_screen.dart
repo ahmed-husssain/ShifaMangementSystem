@@ -87,44 +87,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ],
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: Image.asset(
-                    'assets/ShifaLogo.jpeg',
-                    height: 52,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0056B3),
-                            borderRadius: BorderRadius.circular(8),
+                  padding: const EdgeInsets.all(14),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/ShifaLogo.jpeg',
+                      height: 110,
+                      width: 110,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF047857),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 24),
                           ),
-                          child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Shifa Care',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0056B3),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Al-Shifa',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF047857),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 // Title
                 const Text(
-                  'STAFF ACCESS PORTAL',
+                  'AL-SHIFA HOME NURSING',
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF1E293B), // slate-800
+                    color: Color(0xFF1E293B),
                     letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Staff & Operations Portal',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
                   ),
                 ),
                 if (SupabaseConfig.isStaging) ...[

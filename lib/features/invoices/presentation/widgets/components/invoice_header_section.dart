@@ -44,22 +44,22 @@ class InvoiceHeaderSection extends StatelessWidget {
                       fit: BoxFit.contain,
                       alignment: Alignment.centerLeft,
                       errorBuilder: (_, _, _) => const Text(
-                        'SHIFA HOME HEALTH CARE',
+                        'AL-SHIFA HOME NURSING',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1565C0),
+                          color: Color(0xFF047857),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Your Health, Our Mission',
+                    'Compassionate In-Home Nursing & Care',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1565C0),
+                      color: Color(0xFF047857),
                     ),
                   ),
                 ],

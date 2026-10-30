@@ -74,3 +74,5 @@ functions/node_modules/
 *.sql
 
 .agents/
+.firebase/
+

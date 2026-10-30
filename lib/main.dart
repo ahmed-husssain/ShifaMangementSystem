@@ -34,9 +34,9 @@ class ShifaApp extends ConsumerWidget {
     
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'SHHC Management System',
+      title: 'Al-Shifa Home Nursing',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF047857)),
         useMaterial3: true,
       ),
       routerConfig: router,

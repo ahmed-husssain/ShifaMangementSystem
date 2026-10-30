@@ -1,11 +1,11 @@
 {
-    "name": "CareAgencyOS",
-    "short_name": "CareAgencyOS",
+    "name": "Al-Shifa Home Nursing",
+    "short_name": "Al-Shifa",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Operations and margin-protected billing for private home healthcare agencies.",
+    "background_color": "#047857",
+    "theme_color": "#047857",
+    "description": "Al-Shifa Home Nursing - Operations & Care Coordination Portal.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -13,7 +13,7 @@ void main() {
       expect(details.accountNumber, isNotEmpty);
       expect(details.iban, isNotEmpty);
       expect(details.bankName, equals('Qatar National Bank (QNB)'));
-      expect(details.accountTitle, equals('SHIFA HOME HEALTH CARE'));
+      expect(details.accountTitle, equals('AL-SHIFA HOME NURSING SERVICES WLL'));
     });
 
     test('fromMap parses custom clinic bank details correctly', () {
@@ -94,7 +94,7 @@ void main() {
 
       expect(find.text('BANK TRANSFER DETAILS'), findsOneWidget);
       expect(find.text('Qatar National Bank (QNB)'), findsOneWidget);
-      expect(find.text('SHIFA HOME HEALTH CARE'), findsOneWidget);
+      expect(find.text('AL-SHIFA HOME NURSING SERVICES WLL'), findsOneWidget);
       expect(find.text('00102701151847'), findsOneWidget);
       expect(find.text('QA42QNBA00000000102701151847'), findsOneWidget);
     });

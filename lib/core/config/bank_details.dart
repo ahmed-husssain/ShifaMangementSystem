@@ -17,7 +17,7 @@ class BankDetails {
   /// Default bank details with dynamic compile-time environment overrides
   static const defaultDetails = BankDetails(
     bankName: String.fromEnvironment('CLINIC_BANK_NAME', defaultValue: 'Qatar National Bank (QNB)'),
-    accountTitle: String.fromEnvironment('CLINIC_ACCOUNT_TITLE', defaultValue: 'SHIFA HOME HEALTH CARE'),
+    accountTitle: String.fromEnvironment('CLINIC_ACCOUNT_TITLE', defaultValue: 'AL-SHIFA HOME NURSING SERVICES WLL'),
     accountNumber: String.fromEnvironment('CLINIC_ACCOUNT_NO', defaultValue: '00102701151847'),
     iban: String.fromEnvironment('CLINIC_IBAN', defaultValue: 'QA42QNBA00000000102701151847'),
   );
