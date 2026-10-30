@@ -191,7 +191,7 @@ class _HealthcareServicesSelectorState extends State<HealthcareServicesSelector>
                     ],
                     decoration: InputDecoration(
                       hintText: '0',
-                      prefixText: 'PKR  ',
+                      prefixText: 'QAR  ',
                       prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1565C0)),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -203,7 +203,7 @@ class _HealthcareServicesSelectorState extends State<HealthcareServicesSelector>
                         return 'Please enter a valid positive price';
                       }
                       if (numVal > 10000000) {
-                        return 'Price cannot exceed PKR 10,000,000';
+                        return 'Price cannot exceed QAR 10,000,000';
                       }
                       return null;
                     },
@@ -346,7 +346,7 @@ class _HealthcareServicesSelectorState extends State<HealthcareServicesSelector>
                             if (dailyPrice > 0) ...[
                               const SizedBox(height: 2),
                               Text(
-                                'PKR ${dailyPrice.toStringAsFixed(0)}/day',
+                                'QAR ${dailyPrice.toStringAsFixed(0)}/day',
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w600,

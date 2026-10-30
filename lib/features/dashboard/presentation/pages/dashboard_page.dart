@@ -228,7 +228,7 @@ class _AdminDashboardView extends ConsumerWidget {
               const SizedBox(height: 14),
               _DashboardImageMetricCard(
                 title: 'NET PROFIT',
-                value: 'Rs. ${NumberFormat('#,##0').format(totalRevenue.toInt())}',
+                value: 'QAR ${NumberFormat('#,##0').format(totalRevenue.toInt())}',
                 icon: Icons.account_balance_wallet_rounded,
                 accentColor: const Color(0xFF16A34A),
                 iconBgColor: const Color(0xFFF0FDF4),
@@ -332,7 +332,7 @@ class _StaffDashboardView extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _DashboardImageMetricCard(
                   title: 'MY NET PROFIT',
-                  value: 'Rs. ${NumberFormat('#,##0').format(totalRevenue.toInt())}',
+                  value: 'QAR ${NumberFormat('#,##0').format(totalRevenue.toInt())}',
                   icon: Icons.account_balance_wallet,
                   accentColor: Colors.green,
                   iconBgColor: Colors.green.shade50,

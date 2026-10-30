@@ -25,7 +25,7 @@ class InvoiceTotalsSummary extends StatelessWidget {
       width: 320,
       child: Column(
         children: [
-          _totalRow('SUBTOTAL:', '${subtotal.toStringAsFixed(0)} PKR'),
+          _totalRow('SUBTOTAL:', '${subtotal.toStringAsFixed(0)} QAR'),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -55,7 +55,7 @@ class InvoiceTotalsSummary extends StatelessWidget {
                 )
               else
                 Text(
-                  '${discount.toStringAsFixed(0)} PKR',
+                  '${discount.toStringAsFixed(0)} QAR',
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                 ),
             ],
@@ -79,7 +79,7 @@ class InvoiceTotalsSummary extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${grandTotal.toStringAsFixed(0)} PKR',
+                  '${grandTotal.toStringAsFixed(0)} QAR',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

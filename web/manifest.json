@@ -1,11 +1,11 @@
 {
-    "name": "shifa_management",
-    "short_name": "shifa_management",
+    "name": "CareAgencyOS",
+    "short_name": "CareAgencyOS",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Operations and margin-protected billing for private home healthcare agencies.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

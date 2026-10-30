@@ -191,7 +191,7 @@ class EditableServiceCard extends StatelessWidget {
               itemBuilder: (context) => InvoiceConstants.standardServices.map((serviceName) {
                 final price = InvoiceConstants.standardPrices[serviceName];
                 final priceStr = (price != null && price > 0)
-                    ? ' (Rs. ${formatter.format(price.toInt())})'
+                    ? ' (QAR ${formatter.format(price.toInt())})'
                     : '';
                 return PopupMenuItem<String>(
                   value: serviceName,
@@ -245,7 +245,7 @@ class EditableServiceCard extends StatelessWidget {
                 Expanded(
                   flex: 4,
                   child: _buildField(
-                    label: 'Rate / Day (PKR)',
+                    label: 'Rate / Day (QAR)',
                     required: true,
                     child: TextFormField(
                       controller: item.priceController,
@@ -253,7 +253,7 @@ class EditableServiceCard extends StatelessWidget {
                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
                       decoration: _buildInputDecoration(
                         hintText: '0',
-                        prefixText: 'Rs. ',
+                        prefixText: 'QAR ',
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -304,7 +304,7 @@ class EditableServiceCard extends StatelessWidget {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Rs. ${formatter.format(item.total.toInt())}',
+                          'QAR ${formatter.format(item.total.toInt())}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -333,7 +333,7 @@ class EditableServiceCard extends StatelessWidget {
                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
                       decoration: _buildInputDecoration(
                         hintText: '0',
-                        prefixText: 'Rs. ',
+                        prefixText: 'QAR ',
                         isNarrow: isNarrow,
                       ),
                       validator: (v) {
@@ -385,7 +385,7 @@ class EditableServiceCard extends StatelessWidget {
                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A)),
                   ),
                   Text(
-                    'Rs. ${formatter.format(item.total.toInt())}',
+                    'QAR ${formatter.format(item.total.toInt())}',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,

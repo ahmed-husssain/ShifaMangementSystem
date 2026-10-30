@@ -118,19 +118,19 @@ class FinancesPage extends ConsumerWidget {
               // Metric Cards Stack (Matching Image 100%)
               _buildMetricCard(
                 label: 'TOTAL REVENUE (PATIENT INTAKE)',
-                value: 'Rs. ${formatter.format(totalRevenue.toInt())}',
+                value: 'QAR ${formatter.format(totalRevenue.toInt())}',
                 accentColor: const Color(0xFF2563EB),
               ),
               const SizedBox(height: 14),
               _buildMetricCard(
                 label: 'STAFF EXPENDITURE (PAYOUTS)',
-                value: 'Rs. ${formatter.format(totalPayout.toInt())}',
+                value: 'QAR ${formatter.format(totalPayout.toInt())}',
                 accentColor: const Color(0xFFDC2626),
               ),
               const SizedBox(height: 14),
               _buildMetricCard(
                 label: 'NET OPERATIONAL MARGIN',
-                value: 'Rs. ${formatter.format(totalProfit.toInt())}',
+                value: 'QAR ${formatter.format(totalProfit.toInt())}',
                 accentColor: const Color(0xFF16A34A),
               ),
               const SizedBox(height: 28),
@@ -263,7 +263,7 @@ class FinancesPage extends ConsumerWidget {
               const SizedBox(height: 14),
               _buildMetricCard(
                 label: 'TOTAL STAFF EARNINGS',
-                value: 'Rs. ${formatter.format(totalPayout.toInt())}',
+                value: 'QAR ${formatter.format(totalPayout.toInt())}',
                 accentColor: const Color(0xFF16A34A),
               ),
               const SizedBox(height: 14),
@@ -457,7 +457,7 @@ class FinancesPage extends ConsumerWidget {
                       ),
                       DataCell(
                         Text(
-                          'Rs. ${formatter.format(p.staffPayment.toInt())}',
+                          'QAR ${formatter.format(p.staffPayment.toInt())}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -483,7 +483,7 @@ class FinancesPage extends ConsumerWidget {
                     ),
                     DataCell(
                       Text(
-                        'Rs. ${formatter.format(p.patientAmount.toInt())}',
+                        'QAR ${formatter.format(p.patientAmount.toInt())}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -493,7 +493,7 @@ class FinancesPage extends ConsumerWidget {
                     ),
                     DataCell(
                       Text(
-                        'Rs. ${formatter.format(p.staffPayment.toInt())}',
+                        'QAR ${formatter.format(p.staffPayment.toInt())}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -503,7 +503,7 @@ class FinancesPage extends ConsumerWidget {
                     ),
                     DataCell(
                       Text(
-                        'Rs. ${formatter.format(p.profit.toInt())}',
+                        'QAR ${formatter.format(p.profit.toInt())}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,

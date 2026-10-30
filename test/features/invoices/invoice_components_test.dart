@@ -132,13 +132,13 @@ void main() {
       ),
     );
 
-    expect(find.text('15000 PKR'), findsOneWidget);
-    expect(find.text('1000 PKR'), findsOneWidget);
-    expect(find.text('14000 PKR'), findsOneWidget);
+    expect(find.text('15000 QAR'), findsOneWidget);
+    expect(find.text('1000 QAR'), findsOneWidget);
+    expect(find.text('14000 QAR'), findsOneWidget);
     expect(find.text('PAID'), findsOneWidget);
   });
 
-  testWidgets('InvoiceBankDetailsSection renders Meezan Bank details', (WidgetTester tester) async {
+  testWidgets('InvoiceBankDetailsSection renders Qatar National Bank (QNB) details', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -148,7 +148,7 @@ void main() {
     );
 
     expect(find.text('BANK TRANSFER DETAILS'), findsOneWidget);
-    expect(find.text('Meezan Bank'), findsOneWidget);
+    expect(find.text('Qatar National Bank (QNB)'), findsOneWidget);
   });
 
   testWidgets('InvoicePolicyNotice and InvoiceActionButtons render properly', (WidgetTester tester) async {

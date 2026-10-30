@@ -12,7 +12,7 @@ void main() {
       expect(details.accountTitle, isNotEmpty);
       expect(details.accountNumber, isNotEmpty);
       expect(details.iban, isNotEmpty);
-      expect(details.bankName, equals('Meezan Bank'));
+      expect(details.bankName, equals('Qatar National Bank (QNB)'));
       expect(details.accountTitle, equals('SHIFA HOME HEALTH CARE'));
     });
 
@@ -93,10 +93,10 @@ void main() {
       );
 
       expect(find.text('BANK TRANSFER DETAILS'), findsOneWidget);
-      expect(find.text('Meezan Bank'), findsOneWidget);
+      expect(find.text('Qatar National Bank (QNB)'), findsOneWidget);
       expect(find.text('SHIFA HOME HEALTH CARE'), findsOneWidget);
-      expect(find.text('10270115184708'), findsOneWidget);
-      expect(find.text('PK23MEZN0010270115184708'), findsOneWidget);
+      expect(find.text('00102701151847'), findsOneWidget);
+      expect(find.text('QA42QNBA00000000102701151847'), findsOneWidget);
     });
   });
 

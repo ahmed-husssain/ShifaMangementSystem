@@ -292,7 +292,7 @@ void main() {
 
       expect(find.text('Service #1'), findsOneWidget);
       expect(find.text('Special Nursing Care'), findsOneWidget);
-      expect(find.text('Rs. 15,000'), findsOneWidget);
+      expect(find.text('QAR 15,000'), findsOneWidget);
 
       final removeButton = find.text('Remove');
       expect(removeButton, findsOneWidget);

@@ -590,7 +590,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
                           children: [
                             const Text('Net Profit:', style: TextStyle(fontSize: 16)),
                             Text(
-                              'PKR ${_netProfit.toStringAsFixed(2)}',
+                              'QAR ${_netProfit.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontSize: 18, 
                                 fontWeight: FontWeight.bold,

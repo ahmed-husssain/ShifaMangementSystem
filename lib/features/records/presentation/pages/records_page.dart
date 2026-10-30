@@ -494,7 +494,7 @@ class _RecordsPageState extends ConsumerState<RecordsPage> {
                                                             fit: BoxFit.scaleDown,
                                                             alignment: Alignment.centerRight,
                                                             child: Text(
-                                                              'Rs. ${NumberFormat('#,###').format(p.profit.toInt())}',
+                                                              'QAR ${NumberFormat('#,###').format(p.profit.toInt())}',
                                                               style: const TextStyle(
                                                                 fontWeight: FontWeight.bold,
                                                                 fontSize: 13,

@@ -16,10 +16,10 @@ class BankDetails {
 
   /// Default bank details with dynamic compile-time environment overrides
   static const defaultDetails = BankDetails(
-    bankName: String.fromEnvironment('CLINIC_BANK_NAME', defaultValue: 'Meezan Bank'),
+    bankName: String.fromEnvironment('CLINIC_BANK_NAME', defaultValue: 'Qatar National Bank (QNB)'),
     accountTitle: String.fromEnvironment('CLINIC_ACCOUNT_TITLE', defaultValue: 'SHIFA HOME HEALTH CARE'),
-    accountNumber: String.fromEnvironment('CLINIC_ACCOUNT_NO', defaultValue: '10270115184708'),
-    iban: String.fromEnvironment('CLINIC_IBAN', defaultValue: 'PK23MEZN0010270115184708'),
+    accountNumber: String.fromEnvironment('CLINIC_ACCOUNT_NO', defaultValue: '00102701151847'),
+    iban: String.fromEnvironment('CLINIC_IBAN', defaultValue: 'QA42QNBA00000000102701151847'),
   );
 
   factory BankDetails.fromMap(Map<String, dynamic> map) {

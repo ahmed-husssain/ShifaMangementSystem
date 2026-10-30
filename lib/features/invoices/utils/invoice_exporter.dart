@@ -466,7 +466,7 @@ class InvoiceExporter {
                             ),
                           ),
                           pw.Text(
-                            '${NumberFormat('#,##0').format(invoice.subtotal)} PKR',
+                            '${NumberFormat('#,##0').format(invoice.subtotal)} QAR',
                             style: pw.TextStyle(
                               fontSize: 10,
                               fontWeight: pw.FontWeight.bold,
@@ -488,7 +488,7 @@ class InvoiceExporter {
                             ),
                           ),
                           pw.Text(
-                            '${NumberFormat('#,##0').format(invoice.discount)} PKR',
+                            '${NumberFormat('#,##0').format(invoice.discount)} QAR',
                             style: pw.TextStyle(
                               fontSize: 10,
                               fontWeight: pw.FontWeight.bold,
@@ -521,7 +521,7 @@ class InvoiceExporter {
                               ),
                             ),
                             pw.Text(
-                              '${NumberFormat('#,##0').format(invoice.grandTotal)} PKR',
+                              '${NumberFormat('#,##0').format(invoice.grandTotal)} QAR',
                               style: pw.TextStyle(
                                 color: PdfColors.white,
                                 fontWeight: pw.FontWeight.bold,

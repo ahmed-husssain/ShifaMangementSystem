@@ -461,7 +461,7 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                 ),
               ),
               Text(
-                'Rs. ',
+                'QAR ',
                 style: TextStyle(
                   fontSize: isNarrow ? 13 : 14,
                   fontWeight: FontWeight.bold,
@@ -472,14 +472,14 @@ class InvoiceDetailsEditContent extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _buildField(
-            label: isNarrow ? 'Discount (PKR)' : 'Discount Amount (PKR)',
+            label: isNarrow ? 'Discount (QAR)' : 'Discount Amount (QAR)',
             child: TextFormField(
               controller: discountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
               decoration: _buildInputDecoration(
                 hintText: '0',
-                prefixText: 'Rs. ',
+                prefixText: 'QAR ',
                 isNarrow: isNarrow,
               ),
               validator: (v) {
@@ -526,7 +526,7 @@ class InvoiceDetailsEditContent extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Rs. ',
+                  'QAR ',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

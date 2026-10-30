@@ -26,7 +26,7 @@ class InvoiceDetailsViewContent extends StatelessWidget {
       children: [
         // --- Metadata ---
         _buildSectionTitle('Invoice Metadata'),
-        _buildInfoRow(context, 'Grand Total', 'Rs. ${NumberFormat('#,###').format(invoice.grandTotal.toInt())}'),
+        _buildInfoRow(context, 'Grand Total', 'QAR ${NumberFormat('#,###').format(invoice.grandTotal.toInt())}'),
         _buildInfoRow(context, 'Date & Time', dateStr),
         if (invoice.fromDate != null)
           _buildInfoRow(context, 'Service From', DateFormat('dd/MM/yyyy').format(invoice.fromDate!)),
@@ -145,7 +145,7 @@ class InvoiceDetailsViewContent extends StatelessWidget {
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerRight,
                           child: Text(
-                            'Rs. ${NumberFormat('#,###').format(item.price.toInt())}',
+                            'QAR ${NumberFormat('#,###').format(item.price.toInt())}',
                             style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                             textAlign: TextAlign.right,
                           ),
@@ -169,7 +169,7 @@ class InvoiceDetailsViewContent extends StatelessWidget {
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerRight,
                           child: Text(
-                            'Rs. ${NumberFormat('#,###').format(item.total.toInt())}',
+                            'QAR ${NumberFormat('#,###').format(item.total.toInt())}',
                             style: const TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.bold,
@@ -202,7 +202,7 @@ class InvoiceDetailsViewContent extends StatelessWidget {
                 children: [
                   Text('Subtotal', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                   Text(
-                    'Rs. ${NumberFormat('#,###').format(invoice.subtotal.toInt())}',
+                    'QAR ${NumberFormat('#,###').format(invoice.subtotal.toInt())}',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
                   ),
                 ],
@@ -214,7 +214,7 @@ class InvoiceDetailsViewContent extends StatelessWidget {
                   children: [
                     Text('Discount', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                     Text(
-                      '- Rs. ${NumberFormat('#,###').format(invoice.discount.toInt())}',
+                      '- QAR ${NumberFormat('#,###').format(invoice.discount.toInt())}',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade700),
                     ),
                   ],
@@ -229,7 +229,7 @@ class InvoiceDetailsViewContent extends StatelessWidget {
                 children: [
                   const Text('Grand Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   Text(
-                    'Rs. ${NumberFormat('#,###').format(invoice.grandTotal.toInt())}',
+                    'QAR ${NumberFormat('#,###').format(invoice.grandTotal.toInt())}',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
                   ),
                 ],
