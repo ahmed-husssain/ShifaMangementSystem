@@ -9,6 +9,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   if (SupabaseConfig.isConfigured) {
+    debugPrint('🚀 [SupabaseConfig] Initializing: ${SupabaseConfig.environmentName}');
     await Supabase.initialize(
       url: SupabaseConfig.url,
       anonKey: SupabaseConfig.anonKey,

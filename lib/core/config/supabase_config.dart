@@ -2,63 +2,44 @@ import 'package:flutter/foundation.dart';
 
 enum Environment {
   staging,
-  production,
+  production;
+
+  static Environment resolve() {
+    const env = String.fromEnvironment('APP_ENV');
+    if (env.isNotEmpty) {
+      return env.toLowerCase().startsWith('prod')
+          ? Environment.production
+          : Environment.staging;
+    }
+    return kReleaseMode ? Environment.production : Environment.staging;
+  }
 }
 
 /// Secure Supabase runtime & build configuration.
-/// 
-/// Credentials are read dynamically from compile-time environment variables
-/// (e.g. `--dart-define=SUPABASE_URL=...` or `--dart-define-from-file=.env`).
-/// No live secrets are hardcoded in the codebase.
 class SupabaseConfig {
-  /// Toggle to automatically switch between staging and production based on build mode
-  static const bool useAutomaticSwitch = bool.fromEnvironment(
-    'SUPABASE_AUTO_SWITCH',
-    defaultValue: false,
-  );
+  static final Environment activeEnvironment = Environment.resolve();
 
-  /// Manual selection: Change between Environment.staging and Environment.production
-  static const Environment currentEnvironment = Environment.production;
+  static const String _defaultUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String _defaultAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // -------------------------------------------------------------------------
-  // 1. STAGING CREDENTIALS (Injected via environment or .env)
-  // -------------------------------------------------------------------------
-  static const String _stagingUrl = String.fromEnvironment(
-    'SUPABASE_STAGING_URL',
-    defaultValue: String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
-  );
-  static const String _stagingAnonKey = String.fromEnvironment(
-    'SUPABASE_STAGING_ANON_KEY',
-    defaultValue: String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
-  );
+  static const String _stagingUrl = String.fromEnvironment('SUPABASE_STAGING_URL');
+  static const String _stagingAnonKey = String.fromEnvironment('SUPABASE_STAGING_ANON_KEY');
 
-  // -------------------------------------------------------------------------
-  // 2. PRODUCTION CREDENTIALS (Injected via environment or .env)
-  // -------------------------------------------------------------------------
-  static const String _prodUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: '',
-  );
-  static const String _prodAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: '',
-  );
+  static const String _prodUrl = String.fromEnvironment('SUPABASE_PROD_URL');
+  static const String _prodAnonKey = String.fromEnvironment('SUPABASE_PROD_ANON_KEY');
 
-  // -------------------------------------------------------------------------
-  // RESOLVERS
-  // -------------------------------------------------------------------------
-  static Environment get activeEnvironment {
-    if (useAutomaticSwitch) {
-      return kReleaseMode ? Environment.production : Environment.staging;
-    }
-    return currentEnvironment;
+  static bool get isProduction => activeEnvironment == Environment.production;
+  static bool get isStaging => activeEnvironment == Environment.staging;
+
+  static String get url {
+    if (isProduction) return _prodUrl.isNotEmpty ? _prodUrl : _defaultUrl;
+    return _stagingUrl.isNotEmpty ? _stagingUrl : _defaultUrl;
   }
 
-  static bool get isStaging => activeEnvironment == Environment.staging;
-  static bool get isProduction => activeEnvironment == Environment.production;
-
-  static String get url => isProduction ? _prodUrl : _stagingUrl;
-  static String get anonKey => isProduction ? _prodAnonKey : _stagingAnonKey;
+  static String get anonKey {
+    if (isProduction) return _prodAnonKey.isNotEmpty ? _prodAnonKey : _defaultAnonKey;
+    return _stagingAnonKey.isNotEmpty ? _stagingAnonKey : _defaultAnonKey;
+  }
 
   static bool get isConfigured =>
       url.trim().isNotEmpty &&
@@ -68,3 +49,4 @@ class SupabaseConfig {
   static String get environmentName =>
       isProduction ? 'PRODUCTION (LIVE)' : 'STAGING (TEST DATABASE)';
 }
+

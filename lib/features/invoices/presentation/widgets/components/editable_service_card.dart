@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../../../../../core/theme/app_input_styles.dart';
 import '../../../domain/editable_service_item.dart';
 import '../../../domain/invoice_constants.dart';
 
@@ -29,35 +30,13 @@ class EditableServiceCard extends StatelessWidget {
     String? prefixText,
     bool isNarrow = false,
   }) {
-    return InputDecoration(
+    return AppInputStyles.outline(
       hintText: hintText,
       prefixText: prefixText,
-      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontSize: 13),
-      hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
-      filled: true,
-      fillColor: Colors.white,
       contentPadding: EdgeInsets.symmetric(
         horizontal: isNarrow ? 8 : 12,
         vertical: isNarrow ? 8 : 10,
       ),
-      isDense: true,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFEF4444)),
-      ),
-      errorStyle: const TextStyle(fontSize: 10.5, height: 1.1),
     );
   }
 

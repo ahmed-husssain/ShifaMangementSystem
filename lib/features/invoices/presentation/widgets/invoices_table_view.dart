@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../shared/widgets/payment_status_badge.dart';
 import '../../domain/invoice_model.dart';
 
 class InvoicesTableView extends StatelessWidget {
@@ -16,45 +17,6 @@ class InvoicesTableView extends StatelessWidget {
     required this.onInvoiceTap,
     required this.onExportTap,
   });
-
-  Widget _buildStatusBadge(String status) {
-    final cleanStatus = status.trim().toLowerCase();
-    Color bg;
-    Color border;
-    Color textColor;
-
-    if (cleanStatus == 'paid') {
-      bg = Colors.green.shade100;
-      border = Colors.green.shade400;
-      textColor = Colors.green.shade900;
-    } else if (cleanStatus == 'partial') {
-      bg = Colors.amber.shade100;
-      border = Colors.amber.shade400;
-      textColor = Colors.amber.shade900;
-    } else {
-      bg = Colors.red.shade100;
-      border = Colors.red.shade400;
-      textColor = Colors.red.shade900;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: border),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-          color: textColor,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +151,7 @@ class InvoicesTableView extends StatelessWidget {
                                           runSpacing: 4,
                                           children: [
                                             Text(
-                                              'Rs. ${NumberFormat("#,###").format(inv.grandTotal.toInt())}',
+                                              inv.grandTotal.toCurrency(),
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 12,
@@ -197,7 +159,7 @@ class InvoicesTableView extends StatelessWidget {
                                                 color: Color(0xFF14532D),
                                               ),
                                             ),
-                                            _buildStatusBadge(inv.paymentStatus),
+                                            PaymentStatusBadge(status: inv.paymentStatus),
                                           ],
                                         ),
                                       ),

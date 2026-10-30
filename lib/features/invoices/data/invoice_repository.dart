@@ -142,12 +142,7 @@ class InvoiceRepository {
   }
 
   Future<void> deleteInvoice(String invoiceId) async {
-    try {
-      await _supabase.rpc('admin_delete_invoice', params: {'p_invoice_id': invoiceId});
-    } catch (_) {
-      // Fallback: direct delete from invoices table
-      await _supabase.from('invoices').delete().eq('id', invoiceId);
-    }
+    await _supabase.rpc('admin_delete_invoice', params: {'p_invoice_id': invoiceId});
   }
 
   Future<void> softDeleteInvoice({

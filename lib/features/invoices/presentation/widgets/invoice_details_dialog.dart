@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/errors/app_error.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../shared/widgets/payment_status_badge.dart';
 import '../../domain/invoice_model.dart';
 import '../../domain/editable_service_item.dart';
 import '../../data/invoice_repository.dart';
@@ -476,8 +477,6 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   }
 
   Widget _buildHeader(String role, bool isNarrow) {
-    final isPaid = widget.invoice.paymentStatus.trim().toLowerCase() == 'paid';
-    final isPartial = widget.invoice.paymentStatus.trim().toLowerCase() == 'partial';
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -533,24 +532,9 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isPaid
-                        ? const Color(0xFFDCFCE7)
-                        : (isPartial ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    widget.invoice.paymentStatus.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: isNarrow ? 10 : 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: isPaid
-                          ? const Color(0xFF15803D)
-                          : (isPartial ? const Color(0xFFB45309) : const Color(0xFFB91C1C)),
-                    ),
-                  ),
+                PaymentStatusBadge(
+                  status: widget.invoice.paymentStatus,
+                  fontSize: isNarrow ? 10 : 10.5,
                 ),
               ],
             ),
@@ -576,8 +560,6 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   }
 
   Widget _buildFooter(bool isNarrow) {
-    final formatter = NumberFormat('#,###');
-
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isNarrow ? 12 : 18,
@@ -593,8 +575,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             Expanded(
               child: Text(
                 isNarrow
-                    ? '${_editableServices.length} ${_editableServices.length == 1 ? 'Svc' : 'Svcs'} • Rs. ${formatter.format(_grandTotal.toInt())}'
-                    : '${_editableServices.length} ${_editableServices.length == 1 ? 'Service' : 'Services'}  •  Total: Rs. ${formatter.format(_grandTotal.toInt())}',
+                    ? '${_editableServices.length} ${_editableServices.length == 1 ? 'Svc' : 'Svcs'} • ${_grandTotal.toCurrency()}'
+                    : '${_editableServices.length} ${_editableServices.length == 1 ? 'Service' : 'Services'}  •  Total: ${_grandTotal.toCurrency()}',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

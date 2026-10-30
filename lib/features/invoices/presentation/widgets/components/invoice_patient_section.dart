@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../../core/theme/app_input_styles.dart';
 
 class InvoicePatientSection extends StatelessWidget {
   final TextEditingController? mrNumberController;
@@ -137,16 +138,8 @@ class InvoicePatientSection extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1565C0),
                           ),
-                          decoration: InputDecoration(
+                          decoration: AppInputStyles.compact(
                             hintText: 'Paste MR Number',
-                            hintStyle: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade400,
-                              fontWeight: FontWeight.normal,
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
                             suffixIcon: isSearchingPatient
                                 ? const Padding(
                                     padding: EdgeInsets.all(8.0),
@@ -193,17 +186,7 @@ class InvoicePatientSection extends StatelessWidget {
                         TextField(
                           controller: nameController,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            hintText: 'Patient Name',
-                            hintStyle: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade400,
-                              fontWeight: FontWeight.normal,
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                          ),
+                          decoration: AppInputStyles.compact(hintText: 'Patient Name'),
                         ),
                       ],
                     ),
@@ -246,13 +229,7 @@ class InvoicePatientSection extends StatelessWidget {
                           keyboardType: TextInputType.phone,
                           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]'))],
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            hintText: 'Phone Number',
-                            hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                          ),
+                          decoration: AppInputStyles.compact(hintText: 'Phone Number'),
                         ),
                       ],
                     ),
@@ -275,13 +252,7 @@ class InvoicePatientSection extends StatelessWidget {
                         TextField(
                           controller: addressController,
                           style: const TextStyle(fontSize: 12),
-                          decoration: InputDecoration(
-                            hintText: 'Address',
-                            hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                          ),
+                          decoration: AppInputStyles.compact(hintText: 'Address'),
                         ),
                       ],
                     ),

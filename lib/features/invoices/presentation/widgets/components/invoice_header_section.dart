@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../../../shared/widgets/payment_status_badge.dart';
 
 class InvoiceHeaderSection extends StatelessWidget {
   final String invoiceNumber;
@@ -235,25 +236,7 @@ class InvoiceHeaderSection extends StatelessWidget {
                         ),
                       )
                     else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: paymentStatus == 'Paid'
-                              ? const Color(0xFFDCFCE7)
-                              : const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          paymentStatus.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
-                            color: paymentStatus == 'Paid'
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFFDC2626),
-                          ),
-                        ),
-                      ),
+                      PaymentStatusBadge(status: paymentStatus),
                   ],
                 ),
               ],
