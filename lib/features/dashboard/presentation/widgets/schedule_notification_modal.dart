@@ -227,7 +227,7 @@ class _ScheduleNotificationModalState extends ConsumerState<ScheduleNotification
                       )
                     else
                       DropdownButtonFormField<String>(
-                        value: (patients.any((p) => p.patientId == _selectedPatientId))
+                        initialValue: (patients.any((p) => p.patientId == _selectedPatientId))
                             ? _selectedPatientId
                             : null,
                         hint: const Text('Select Patient'),

@@ -23,7 +23,7 @@ import 'widgets/components/invoice_policy_notice.dart';
 import 'widgets/components/invoice_action_buttons.dart';
 import 'widgets/patient_picker_modal.dart';
 
-const Map<String, double> SERVICE_PRICES = {
+const Map<String, double> servicePrices = {
   "SELECT SERVICE": 0,
 "Online Doctor Consultation": 0,
 "Home Physiotherapy": 3000,
@@ -392,8 +392,8 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
             } else if (s['price'] != null) {
               price = (s['price'] as num).toDouble();
             }
-            if (price <= 0 && SERVICE_PRICES.containsKey(sName)) {
-              price = SERVICE_PRICES[sName]!;
+            if (price <= 0 && servicePrices.containsKey(sName)) {
+              price = servicePrices[sName]!;
             }
             _items.add(InvoiceItem(
               serviceName: sName,

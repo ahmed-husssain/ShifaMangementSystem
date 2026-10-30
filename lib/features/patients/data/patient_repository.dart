@@ -5,6 +5,7 @@ import '../../../shared/providers/auth_provider.dart';
 import '../../invoices/data/invoice_repository.dart';
 import '../../invoices/domain/invoice_model.dart';
 import '../../users/presentation/pages/users_page.dart';
+import '../../../core/services/audit_logger.dart';
 
 final patientRepositoryProvider = Provider<PatientRepository>((ref) {
   return PatientRepository(ref.watch(supabaseClientProvider));
@@ -299,17 +300,17 @@ class PatientRepository {
     await _supabase.from('patients').insert(pMap);
 
     // Log activity
-    await _supabase.from('activities').insert({
-      'user_id': patient.createdBy,
-      'user_name': (userName != null && userName.isNotEmpty) ? userName : 'Staff User',
-      'role': 'staff',
-      'action': 'PATIENT_CREATED',
-      'entity_type': 'patient',
-      'entity_id': patientId,
-      'description': 'Registered patient ${patient.patientName}',
-      'organization_id': patient.organizationId,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'PATIENT_CREATED',
+      entityType: 'patient',
+      entityId: patientId,
+      description: 'Registered patient ${patient.patientName}',
+      organizationId: patient.organizationId,
+      userId: patient.createdBy,
+      userName: (userName != null && userName.isNotEmpty) ? userName : 'Staff User',
+      role: 'staff',
+    );
   }
 
   Future<void> updatePatient(Patient patient) async {
@@ -342,17 +343,17 @@ class PatientRepository {
     }).eq('patient_id', patientId);
 
     // Log activity
-    await _supabase.from('activities').insert({
-      'user_id': userId,
-      'user_name': 'User',
-      'role': 'admin',
-      'action': 'PATIENT_DELETED',
-      'entity_type': 'patient',
-      'entity_id': patientId,
-      'description': 'Soft-deleted patient $patientName and associated invoice(s)',
-      'organization_id': organizationId,
-      'timestamp': now,
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'PATIENT_DELETED',
+      entityType: 'patient',
+      entityId: patientId,
+      description: 'Soft-deleted patient $patientName and associated invoice(s)',
+      organizationId: organizationId,
+      userId: userId,
+      userName: 'User',
+      role: 'admin',
+    );
   }
 
   Future<void> restorePatient({
@@ -381,17 +382,17 @@ class PatientRepository {
     }).eq('patient_id', patientId);
 
     // Log activity
-    await _supabase.from('activities').insert({
-      'user_id': userId,
-      'user_name': 'Admin',
-      'role': 'admin',
-      'action': 'PATIENT_RESTORED',
-      'entity_type': 'patient',
-      'entity_id': patientId,
-      'description': 'Restored patient $patientName and associated invoices',
-      'organization_id': organizationId,
-      'timestamp': now,
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'PATIENT_RESTORED',
+      entityType: 'patient',
+      entityId: patientId,
+      description: 'Restored patient $patientName and associated invoices',
+      organizationId: organizationId,
+      userId: userId,
+      userName: 'Admin',
+      role: 'admin',
+    );
   }
 
   Future<void> discontinuePatient({
@@ -415,17 +416,17 @@ class PatientRepository {
       'is_deleted': false,
     }).eq('patient_id', patientId);
 
-    await _supabase.from('activities').insert({
-      'user_id': userId,
-      'user_name': userName ?? 'Staff',
-      'role': 'staff',
-      'action': 'PATIENT_DISCONTINUED',
-      'entity_type': 'patient',
-      'entity_id': patientId,
-      'description': 'Discontinued patient $patientName and locked active invoices',
-      'organization_id': organizationId,
-      'timestamp': now,
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'PATIENT_DISCONTINUED',
+      entityType: 'patient',
+      entityId: patientId,
+      description: 'Discontinued patient $patientName and locked active invoices',
+      organizationId: organizationId,
+      userId: userId,
+      userName: userName ?? 'Staff',
+      role: 'staff',
+    );
   }
 
   Future<void> reactivatePatient({
@@ -451,17 +452,17 @@ class PatientRepository {
       'is_deleted': false,
     }).eq('patient_id', patientId);
 
-    await _supabase.from('activities').insert({
-      'user_id': userId,
-      'user_name': userName ?? 'Staff',
-      'role': 'staff',
-      'action': 'PATIENT_REACTIVATED',
-      'entity_type': 'patient',
-      'entity_id': patientId,
-      'description': 'Reactivated patient $patientName and unlocked invoices',
-      'organization_id': organizationId,
-      'timestamp': now,
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'PATIENT_REACTIVATED',
+      entityType: 'patient',
+      entityId: patientId,
+      description: 'Reactivated patient $patientName and unlocked invoices',
+      organizationId: organizationId,
+      userId: userId,
+      userName: userName ?? 'Staff',
+      role: 'staff',
+    );
   }
 
   Future<Patient?> getPatientById(String patientId) async {

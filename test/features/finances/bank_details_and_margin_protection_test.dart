@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shifa_management/core/config/bank_details.dart';
-import 'package:shifa_management/features/invoices/domain/invoice_model.dart';
 import 'package:shifa_management/features/invoices/presentation/widgets/components/invoice_bank_details_section.dart';
 import 'package:shifa_management/features/patients/domain/patient_model.dart';
 

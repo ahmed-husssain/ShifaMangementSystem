@@ -12,6 +12,7 @@ void main() async {
     debugPrint('🚀 [SupabaseConfig] Initializing: ${SupabaseConfig.environmentName}');
     await Supabase.initialize(
       url: SupabaseConfig.url,
+      // ignore: deprecated_member_use
       anonKey: SupabaseConfig.anonKey,
     );
   } else {

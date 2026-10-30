@@ -162,7 +162,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _selectedRole,
+                        initialValue: _selectedRole,
                         decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
                         items: const [
                           DropdownMenuItem(value: 'staff', child: Text('User')),

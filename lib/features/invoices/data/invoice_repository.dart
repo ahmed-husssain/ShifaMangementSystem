@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/invoice_model.dart';
 import '../domain/invoice_creation_result.dart';
 import '../../../shared/providers/auth_provider.dart';
+import '../../../core/services/audit_logger.dart';
 import '../../patients/data/patient_repository.dart';
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
@@ -131,17 +132,17 @@ class InvoiceRepository {
       'deleted_by': userId,
     }).eq('id', invoiceId);
 
-    await _supabase.from('activities').insert({
-      'user_id': userId,
-      'user_name': userName ?? 'User',
-      'role': role ?? 'staff',
-      'action': 'INVOICE_DELETED',
-      'entity_type': 'invoice',
-      'entity_id': invoiceId,
-      'description': 'Deleted invoice $invoiceNumber',
-      'organization_id': organizationId,
-      'timestamp': now,
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'INVOICE_DELETED',
+      entityType: 'invoice',
+      entityId: invoiceId,
+      description: 'Deleted invoice $invoiceNumber',
+      organizationId: organizationId,
+      userId: userId,
+      userName: userName,
+      role: role,
+    );
   }
 
   Future<void> restoreInvoice({
@@ -149,6 +150,8 @@ class InvoiceRepository {
     required String invoiceNumber,
     required String userId,
     required String organizationId,
+    String? userName,
+    String? role,
   }) async {
     final now = DateTime.now().toIso8601String();
 
@@ -159,17 +162,17 @@ class InvoiceRepository {
       'updated_at': now,
     }).eq('id', invoiceId);
 
-    await _supabase.from('activities').insert({
-      'user_id': userId,
-      'user_name': 'Admin',
-      'role': 'admin',
-      'action': 'INVOICE_RESTORED',
-      'entity_type': 'invoice',
-      'entity_id': invoiceId,
-      'description': 'Restored invoice $invoiceNumber',
-      'organization_id': organizationId,
-      'timestamp': now,
-    });
+    await AuditLogger.log(
+      supabase: _supabase,
+      action: 'INVOICE_RESTORED',
+      entityType: 'invoice',
+      entityId: invoiceId,
+      description: 'Restored invoice $invoiceNumber',
+      organizationId: organizationId,
+      userId: userId,
+      userName: userName ?? 'Admin',
+      role: role ?? 'admin',
+    );
   }
 
   Future<List<Invoice>> getInvoicesForPatient(String patientId) async {

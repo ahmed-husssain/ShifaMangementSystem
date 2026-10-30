@@ -133,7 +133,7 @@ class MainLayout extends ConsumerWidget {
         child: NavigationBarTheme(
           data: NavigationBarThemeData(
             backgroundColor: Colors.transparent,
-            indicatorColor: Colors.white.withOpacity(0.25),
+            indicatorColor: Colors.white.withValues(alpha: 0.25),
             iconTheme: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
                 return const IconThemeData(color: Colors.white, size: 24);
@@ -257,7 +257,7 @@ class _PulsingNotificationBellState extends State<_PulsingNotificationBell> with
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.red.withOpacity(0.5),
+                      color: Colors.red.withValues(alpha: 0.5),
                       blurRadius: 6,
                       spreadRadius: 1,
                     ),
