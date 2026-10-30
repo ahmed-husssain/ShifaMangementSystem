@@ -50,16 +50,12 @@ class ScheduledNotificationRepository {
   }
 
   Future<void> markAsCompleted(String patientId, String reminderId) async {
-    try {
-      await _supabase.from('scheduled_notifications').update({
-        'is_sent': true,
-      }).eq('id', reminderId);
-    } catch (_) {}
+    await _supabase.from('scheduled_notifications').update({
+      'is_sent': true,
+    }).eq('id', reminderId);
   }
 
   Future<void> deleteScheduledNotification(String patientId, String reminderId) async {
-    try {
-      await _supabase.from('scheduled_notifications').delete().eq('id', reminderId);
-    } catch (_) {}
+    await _supabase.from('scheduled_notifications').delete().eq('id', reminderId);
   }
 }

@@ -7,13 +7,21 @@ import '../../invoices/domain/invoice_model.dart';
 import '../../users/presentation/pages/users_page.dart';
 
 final patientRepositoryProvider = Provider<PatientRepository>((ref) {
-  return PatientRepository(
-    supabase: ref.watch(supabaseClientProvider),
-  );
+  return PatientRepository(ref.watch(supabaseClientProvider));
 });
 
-/// Map of patient entity_id (or MR number) -> creator user_name from activities log
-final patientCreatorsMapProvider = StreamProvider<Map<String, String>>((ref) {
+class ActivityMappings {
+  final Map<String, String> creatorsMap;
+  final Map<String, String> legacyUidToName;
+
+  const ActivityMappings({
+    this.creatorsMap = const {},
+    this.legacyUidToName = const {},
+  });
+}
+
+/// Single consolidated stream for activities mappings to reduce realtime network traffic
+final activityMappingsProvider = StreamProvider<ActivityMappings>((ref) {
   final supabase = ref.watch(supabaseClientProvider);
   return supabase
       .from('activities')
@@ -21,42 +29,39 @@ final patientCreatorsMapProvider = StreamProvider<Map<String, String>>((ref) {
       .order('timestamp', ascending: false)
       .limit(500)
       .map((rows) {
-        final map = <String, String>{};
+        final creators = <String, String>{};
+        final legacyMap = <String, String>{};
         for (final row in rows) {
           final entityId = (row['entity_id'] ?? row['entityId'] ?? '').toString().trim();
           final userName = (row['user_name'] ?? row['userName'] ?? '').toString().trim();
+          final userId = (row['user_id'] ?? row['userId'] ?? '').toString().trim().toLowerCase();
           final action = (row['action'] ?? '').toString().toUpperCase();
-          if (entityId.isNotEmpty && userName.isNotEmpty && !isGenericStaffIdentifier(userName)) {
-            if (action == 'PATIENT_CREATED' || action.contains('REGISTER') || action.contains('CREATE')) {
-              map[entityId] = userName;
-            } else if (!map.containsKey(entityId)) {
-              map[entityId] = userName;
+
+          if (userName.isNotEmpty && !isGenericStaffIdentifier(userName)) {
+            if (entityId.isNotEmpty) {
+              if (action == 'PATIENT_CREATED' || action.contains('REGISTER') || action.contains('CREATE')) {
+                creators[entityId] = userName;
+              } else if (!creators.containsKey(entityId)) {
+                creators[entityId] = userName;
+              }
+            }
+            if (userId.isNotEmpty) {
+              legacyMap[userId] = userName;
             }
           }
         }
-        return map;
+        return ActivityMappings(creatorsMap: creators, legacyUidToName: legacyMap);
       });
 });
 
+/// Map of patient entity_id (or MR number) -> creator user_name from activities log
+final patientCreatorsMapProvider = Provider<Map<String, String>>((ref) {
+  return ref.watch(activityMappingsProvider).value?.creatorsMap ?? const {};
+});
+
 /// Map of legacy user_id -> user_name from activities log
-final legacyUidToNameProvider = StreamProvider<Map<String, String>>((ref) {
-  final supabase = ref.watch(supabaseClientProvider);
-  return supabase
-      .from('activities')
-      .stream(primaryKey: ['id'])
-      .order('timestamp', ascending: false)
-      .limit(500)
-      .map((rows) {
-        final map = <String, String>{};
-        for (final row in rows) {
-          final userId = (row['user_id'] ?? row['userId'] ?? '').toString().trim().toLowerCase();
-          final userName = (row['user_name'] ?? row['userName'] ?? '').toString().trim();
-          if (userId.isNotEmpty && userName.isNotEmpty && !isGenericStaffIdentifier(userName)) {
-            map[userId] = userName;
-          }
-        }
-        return map;
-      });
+final legacyUidToNameProvider = Provider<Map<String, String>>((ref) {
+  return ref.watch(activityMappingsProvider).value?.legacyUidToName ?? const {};
 });
 
 bool _patientHasOtherRegisteredCreator(
@@ -230,8 +235,8 @@ final staffPatientsProvider = StreamProvider<List<Patient>>((ref) {
   final allPatientsAsync = ref.watch(allPatientsProvider(false));
   final allUsersAsync = ref.watch(allUsersProvider);
   final allInvoicesAsync = ref.watch(allInvoicesProvider(false));
-  final activitiesCreatorsAsync = ref.watch(patientCreatorsMapProvider);
-  final legacyUidMapAsync = ref.watch(legacyUidToNameProvider);
+  final activitiesCreators = ref.watch(patientCreatorsMapProvider);
+  final legacyUidMap = ref.watch(legacyUidToNameProvider);
 
   if (allPatientsAsync.isLoading) {
     return const Stream.empty();
@@ -243,8 +248,6 @@ final staffPatientsProvider = StreamProvider<List<Patient>>((ref) {
 
       final allUsers = allUsersAsync.value;
       final allInvoices = allInvoicesAsync.value;
-      final activitiesCreators = activitiesCreatorsAsync.value;
-      final legacyUidMap = legacyUidMapAsync.value;
 
       final list = allPatients.where((p) {
         return matchesStaffPatient(
@@ -268,27 +271,7 @@ final staffPatientsProvider = StreamProvider<List<Patient>>((ref) {
 class PatientRepository {
   final SupabaseClient _supabase;
 
-  PatientRepository({required SupabaseClient supabase}) : _supabase = supabase;
-
-  Stream<List<Patient>> watchStaffPatients(String staffId, {Set<String>? staffIdentifiers}) {
-    final allIds = <String>{
-      if (staffId.isNotEmpty) staffId,
-      if (staffIdentifiers != null) ...staffIdentifiers,
-    };
-
-    return _supabase
-        .from('patients')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .map((rows) {
-          final list = rows
-              .map((doc) => Patient.fromMap(doc, (doc['id'] ?? '').toString()))
-              .where((p) => !p.isDeleted && matchesStaffPatient(p, allIds))
-              .toList();
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
-  }
+  PatientRepository(this._supabase);
 
   Stream<List<Patient>> watchAllPatients({bool includeDeleted = false}) {
     return _supabase
@@ -491,12 +474,15 @@ class PatientRepository {
     return Patient.fromMap(res, (res['id'] ?? '').toString());
   }
 
-  /// Read-only preview of next MR Number (does NOT increment database counter)
-  Future<String> previewNextMRNumber() async {
-    try {
-      int maxNumber = 4000;
+  String _formatMRNumber(int count) {
+    final now = DateTime.now();
+    final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    return 'SHHC-$dateStr-$count';
+  }
 
-      // 1. Fetch latest patients from database to determine the highest existing MR Number
+  Future<int> _fetchCurrentMaxMRNumber() async {
+    int maxNumber = 4000;
+    try {
       final patientsRes = await _supabase
           .from('patients')
           .select('mr_number')
@@ -514,84 +500,38 @@ class PatientRepository {
         }
       }
 
-      // 2. Also check system_metrics counter as a cross-reference
-      try {
-        final metricDoc = await _supabase
-            .from('system_metrics')
-            .select('total_patients')
-            .eq('organization_id', 'mr_counter')
-            .maybeSingle();
-        if (metricDoc != null && metricDoc['total_patients'] != null) {
-          final countVal = (metricDoc['total_patients'] as num).toInt();
-          if (countVal > maxNumber) {
-            maxNumber = countVal;
-          }
+      final metricDoc = await _supabase
+          .from('system_metrics')
+          .select('total_patients')
+          .eq('organization_id', 'mr_counter')
+          .maybeSingle();
+      if (metricDoc != null && metricDoc['total_patients'] != null) {
+        final countVal = (metricDoc['total_patients'] as num).toInt();
+        if (countVal > maxNumber) {
+          maxNumber = countVal;
         }
-      } catch (_) {}
+      }
+    } catch (_) {}
+    return maxNumber;
+  }
 
-      final nextCount = maxNumber + 1;
-      final now = DateTime.now();
-      final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-      return 'SHHC-$dateStr-$nextCount';
-    } catch (_) {
-      final now = DateTime.now();
-      final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-      return 'SHHC-$dateStr-4031';
-    }
+  /// Read-only preview of next MR Number (does NOT increment database counter)
+  Future<String> previewNextMRNumber() async {
+    final maxNum = await _fetchCurrentMaxMRNumber();
+    return _formatMRNumber(maxNum + 1);
   }
 
   /// Atomically / sequentially gets the next MR Number and increments counter
   Future<String> getNextMRNumber() async {
-    int nextCount = 4031;
+    final nextCount = (await _fetchCurrentMaxMRNumber()) + 1;
     try {
-      int maxNumber = 4000;
-
-      // 1. Fetch latest patients to guarantee exact sequence from actual records
-      final patientsRes = await _supabase
-          .from('patients')
-          .select('mr_number')
-          .order('created_at', ascending: false)
-          .limit(50);
-
-      for (final item in patientsRes) {
-        final mr = item['mr_number']?.toString() ?? '';
-        final match = RegExp(r'-(\d+)$').firstMatch(mr);
-        if (match != null) {
-          final val = int.tryParse(match.group(1)!);
-          if (val != null && val > maxNumber) {
-            maxNumber = val;
-          }
-        }
-      }
-
-      // 2. Also check system_metrics counter
-      try {
-        final metricDoc = await _supabase
-            .from('system_metrics')
-            .select('total_patients')
-            .eq('organization_id', 'mr_counter')
-            .maybeSingle();
-        if (metricDoc != null && metricDoc['total_patients'] != null) {
-          final countVal = (metricDoc['total_patients'] as num).toInt();
-          if (countVal > maxNumber) {
-            maxNumber = countVal;
-          }
-        }
-      } catch (_) {}
-
-      nextCount = maxNumber + 1;
-
-      // 3. Keep system_metrics in sync
       await _supabase.from('system_metrics').upsert({
         'organization_id': 'mr_counter',
         'total_patients': nextCount,
         'updated_at': DateTime.now().toIso8601String(),
       });
     } catch (_) {}
-
-    final now = DateTime.now();
-    final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    return 'SHHC-$dateStr-$nextCount';
+    return _formatMRNumber(nextCount);
   }
 
 

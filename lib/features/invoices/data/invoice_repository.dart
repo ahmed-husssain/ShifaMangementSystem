@@ -6,9 +6,7 @@ import '../../../shared/providers/auth_provider.dart';
 import '../../patients/data/patient_repository.dart';
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
-  return InvoiceRepository(
-    supabase: ref.watch(supabaseClientProvider),
-  );
+  return InvoiceRepository(ref.watch(supabaseClientProvider));
 });
 
 bool matchesStaffInvoice(
@@ -34,35 +32,7 @@ bool matchesStaffInvoice(
 class InvoiceRepository {
   final SupabaseClient _supabase;
 
-  InvoiceRepository({required SupabaseClient supabase}) : _supabase = supabase;
-
-  Stream<List<Invoice>> watchStaffInvoices(
-    String staffId, {
-    Set<String>? staffIdentifiers,
-    Set<String>? staffPatientIds,
-    int limit = 500,
-  }) {
-    return _supabase
-        .from('invoices')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .limit(limit)
-        .map((rows) {
-          final pIds = staffPatientIds ?? {};
-          final sIds = staffIdentifiers ?? {};
-          if (pIds.isEmpty && sIds.isEmpty) return <Invoice>[];
-
-          final list = rows
-              .map((doc) => Invoice.fromMap(doc, (doc['id'] ?? '').toString()))
-              .where((inv) {
-                if (inv.isDeleted || inv.isDiscontinued) return false;
-                return matchesStaffInvoice(inv, pIds, staffIdentifiers: sIds);
-              })
-              .toList();
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
-  }
+  InvoiceRepository(this._supabase);
 
   Stream<List<Invoice>> watchAllInvoices({bool includeDeleted = false, int limit = 500}) {
     return _supabase
