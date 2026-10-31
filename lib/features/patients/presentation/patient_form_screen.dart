@@ -263,7 +263,7 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
         return;
       }
       final cnicVal = _cnicController.text.trim();
-      if (cnicVal.isNotEmpty && !RegExp(r'^\d{5}-\d{7}-\d{1}$').hasMatch(cnicVal)) {
+      if (cnicVal.isNotEmpty && !RegExp(r'^[A-Za-z0-9\-]{7,18}$').hasMatch(cnicVal)) {
         _scrollToAndFocus(_cnicKey, _cnicFocusNode);
         return;
       }
@@ -447,18 +447,18 @@ class _PatientFormScreenState extends ConsumerState<PatientFormScreen> {
                       ),
                       _buildField(
                         _cnicController, 
-                        'CNIC (XXXXX-XXXXXXX-X)', 
+                        'Qatar ID (QID) / Passport', 
                         required: false,
                         focusNode: _cnicFocusNode,
                         fieldKey: _cnicKey,
                         inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          CnicInputFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+                          LengthLimitingTextInputFormatter(18),
                         ],
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return null;
-                          final regExp = RegExp(r'^\d{5}-\d{7}-\d{1}$');
-                          if (!regExp.hasMatch(v.trim())) return 'Invalid CNIC format';
+                          final regExp = RegExp(r'^[A-Za-z0-9\-]{7,18}$');
+                          if (!regExp.hasMatch(v.trim())) return 'Invalid QID or Passport format';
                           return null;
                         },
                       ),

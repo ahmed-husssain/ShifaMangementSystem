@@ -1052,7 +1052,7 @@ class _PatientDetailsModal extends ConsumerWidget {
           const Divider(),
           _buildDetailRow(context, 'Name', patient.patientName),
           _buildDetailRow(context, 'MR Number', patient.mrNumber),
-          _buildDetailRow(context, 'CNIC', patient.cnic),
+          _buildDetailRow(context, 'Qatar ID (QID)', patient.cnic),
           _buildDetailRow(context, 'Phone', patient.phone),
           _buildDetailRow(context, 'Address', patient.address),
           const SizedBox(height: 16),

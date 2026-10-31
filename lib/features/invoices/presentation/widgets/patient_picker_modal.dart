@@ -68,7 +68,7 @@ class _PatientPickerModalState extends ConsumerState<PatientPickerModal> {
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchFilter = val.trim().toLowerCase()),
                 decoration: InputDecoration(
-                  hintText: 'Filter by Name, MR#, or CNIC...',
+                  hintText: 'Filter by Name, MR#, or Qatar ID (QID)...',
                   prefixIcon: const Icon(Icons.search, size: 20),
                   suffixIcon: _searchFilter.isNotEmpty
                       ? IconButton(
@@ -108,7 +108,7 @@ class _PatientPickerModalState extends ConsumerState<PatientPickerModal> {
                         return ListTile(
                           leading: const CircleAvatar(child: Icon(Icons.person)),
                           title: Text(p.patientName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('MR: ${p.mrNumber} • CNIC: ${p.cnic}'),
+                          subtitle: Text(p.cnic.isNotEmpty ? 'MR: ${p.mrNumber} • QID: ${p.cnic}' : 'MR: ${p.mrNumber}'),
                           onTap: () => Navigator.of(context).pop(p),
                         );
                       },
